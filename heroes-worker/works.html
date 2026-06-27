@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>施工事例｜Heroes Worker</title>
+<meta name="description" content="Heroes Worker（ヒーローズワーカー）の施工事例・実績写真。溶接・金属加工・製缶・オーダー製作などの実績をご紹介します。">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --orange:#ff7a18;--orange-bright:#ff9a3c;--orange-deep:#e85d04;--ember:#ffb347;
+    --bg:#0a0a0a;--bg-2:#121212;--panel:#171717;--panel-2:#1d1d1d;--line:#2a2a2a;
+    --ink:#f5f5f4;--ink-soft:#a3a3a3;--ink-dim:#737373;
+    --radius:14px;--maxw:1140px;--shadow:0 16px 40px rgba(0,0,0,.5);--glow:0 0 28px rgba(255,122,24,.45);
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:"Noto Sans JP",system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg);line-height:1.85;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  img{max-width:100%;display:block}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  .display{font-family:"Oswald",sans-serif;letter-spacing:.02em}
+  .btn{display:inline-flex;align-items:center;gap:.5em;padding:15px 30px;border-radius:8px;font-weight:700;font-size:15px;transition:transform .15s ease,box-shadow .2s ease,background .2s ease;cursor:pointer;border:none}
+  .btn-primary{background:linear-gradient(135deg,var(--orange),var(--orange-deep));color:#fff;box-shadow:var(--glow)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 36px rgba(255,122,24,.65)}
+  .btn-ghost{background:transparent;color:var(--orange);border:2px solid var(--orange)}
+  .btn-ghost:hover{background:var(--orange);color:#0a0a0a}
+
+  /* Header */
+  header{position:sticky;top:0;z-index:50;background:rgba(10,10,10,.82);backdrop-filter:saturate(160%) blur(12px);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:74px}
+  .logo{display:flex;align-items:center;gap:12px}
+  .logo img{height:46px;width:auto}
+  .logo .name{font-family:"Oswald",sans-serif;font-weight:700;font-size:21px;letter-spacing:.04em;color:#fff}
+  .logo .name b{color:var(--orange)}
+  .nav-links{display:flex;align-items:center;gap:30px}
+  .nav-links a{font-size:15px;font-weight:500;color:var(--ink-soft);transition:color .15s}
+  .nav-links a:hover,.nav-links a.active{color:var(--orange)}
+  .nav-cta{display:flex;align-items:center;gap:14px}
+  .menu-btn{display:none;background:none;border:none;font-size:26px;cursor:pointer;color:var(--ink)}
+  @media(max-width:900px){
+    .nav-links{position:fixed;inset:74px 0 auto 0;flex-direction:column;gap:0;background:var(--bg-2);border-bottom:1px solid var(--line);max-height:0;overflow:hidden;transition:max-height .3s ease}
+    .nav-links.open{max-height:360px}
+    .nav-links a{width:100%;padding:16px 24px;border-bottom:1px solid var(--line)}
+    .nav-cta .btn{display:none}.menu-btn{display:block}
+  }
+
+  /* Page hero */
+  .page-hero{position:relative;overflow:hidden;text-align:center;padding:80px 0 64px;
+    background:radial-gradient(800px 400px at 50% -10%,rgba(255,122,24,.2),transparent 60%),linear-gradient(180deg,#0d0d0d,#0a0a0a)}
+  .page-hero .kicker{font-family:"Oswald",sans-serif;font-size:14px;font-weight:700;letter-spacing:.22em;color:var(--orange);text-transform:uppercase}
+  .page-hero h1{font-size:clamp(30px,5vw,46px);font-weight:900;margin:8px 0 14px}
+  .page-hero p{color:var(--ink-soft);font-size:16px;max-width:40em;margin:0 auto}
+  .crumbs{font-size:13px;color:var(--ink-dim);margin-top:18px}
+  .crumbs a:hover{color:var(--orange)}
+
+  /* Filter */
+  .filters{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:40px 0 36px}
+  .filter{background:var(--panel);border:1px solid var(--line);color:var(--ink-soft);padding:9px 20px;border-radius:999px;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s}
+  .filter:hover{border-color:var(--orange);color:var(--ink)}
+  .filter.active{background:linear-gradient(135deg,var(--orange),var(--orange-deep));color:#fff;border-color:transparent}
+
+  /* Gallery */
+  .gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding-bottom:20px}
+  .item{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;transition:transform .2s,box-shadow .2s,border-color .2s;cursor:pointer}
+  .item:hover{transform:translateY(-5px);box-shadow:var(--shadow);border-color:#3a3a3a}
+  .item .thumb{aspect-ratio:4/3;position:relative;background:linear-gradient(135deg,#1a1a1a,#262626);display:grid;place-items:center;color:var(--ink-dim);font-size:14px;overflow:hidden}
+  .item .thumb img{width:100%;height:100%;object-fit:cover}
+  .item .badge{position:absolute;left:12px;top:12px;font-size:12px;font-weight:700;color:#fff;background:rgba(255,122,24,.92);padding:4px 12px;border-radius:999px}
+  .item .body{padding:18px 20px}
+  .item .body h3{font-size:17px;margin-bottom:6px}
+  .item .body p{color:var(--ink-soft);font-size:14px}
+  .item.hide{display:none}
+  @media(max-width:900px){.gallery{grid-template-columns:1fr 1fr;gap:14px}}
+  @media(max-width:560px){.gallery{grid-template-columns:1fr}}
+
+  .empty-note{text-align:center;color:var(--ink-dim);font-size:14px;padding:30px 0}
+
+  /* CTA */
+  section{padding:80px 0}
+  .cta{background:radial-gradient(600px 300px at 50% 0%,rgba(255,122,24,.3),transparent 70%),linear-gradient(135deg,var(--orange-deep),#7a2e00);color:#fff;text-align:center;border-radius:24px;padding:60px 28px;box-shadow:var(--shadow)}
+  .cta h2{font-size:clamp(24px,4vw,34px);font-weight:900;margin-bottom:14px}
+  .cta p{opacity:.95;margin-bottom:28px;font-size:16px}
+  .cta .btn-white{background:#0a0a0a;color:#fff}
+  .cta .btn-white:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(0,0,0,.4)}
+
+  /* Footer */
+  footer{background:#060606;color:#a3a3a3;padding:56px 0 28px;border-top:1px solid var(--line)}
+  .foot-grid{display:flex;justify-content:space-between;gap:40px;flex-wrap:wrap;margin-bottom:36px}
+  .foot-brand .logo{margin-bottom:14px}
+  .foot-brand p{font-size:14px;max-width:30em;color:var(--ink-dim)}
+  .foot-cols{display:flex;gap:64px;flex-wrap:wrap}
+  .foot-col h4{font-family:"Oswald",sans-serif;font-size:13px;letter-spacing:.14em;color:#fff;margin-bottom:14px;text-transform:uppercase}
+  .foot-col a{display:block;font-size:14px;color:var(--ink-dim);padding:5px 0;transition:color .15s}
+  .foot-col a:hover{color:var(--orange)}
+  .foot-bottom{border-top:1px solid var(--line);padding-top:24px;font-size:13px;color:var(--ink-dim);text-align:center}
+
+  /* Lightbox */
+  .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:100;display:none;place-items:center;padding:24px}
+  .lightbox.open{display:grid}
+  .lightbox .lb-inner{max-width:900px;width:100%;text-align:center}
+  .lightbox .lb-stage{aspect-ratio:4/3;border-radius:var(--radius);background:linear-gradient(135deg,#1a1a1a,#262626);display:grid;place-items:center;color:var(--ink-soft);font-size:15px;overflow:hidden;border:1px solid var(--line)}
+  .lightbox .lb-stage img{width:100%;height:100%;object-fit:contain}
+  .lightbox .lb-cap{margin-top:16px;color:var(--ink)}
+  .lightbox .lb-cap .t{font-weight:700;font-size:18px}
+  .lightbox .lb-cap .d{color:var(--ink-soft);font-size:14px;margin-top:4px}
+  .lightbox .lb-close{position:absolute;top:20px;right:24px;font-size:32px;color:#fff;background:none;border:none;cursor:pointer;line-height:1}
+
+  .reveal{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+  .reveal.in{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header>
+  <div class="wrap nav">
+    <a href="index.html#top" class="logo">
+      <img src="logo.png" alt="Heroes Worker">
+      <span class="name">HEROES <b>WORKER</b></span>
+    </a>
+    <nav class="nav-links" id="navLinks">
+      <a href="index.html#services">事業内容</a>
+      <a href="index.html#strengths">強み</a>
+      <a href="works.html" class="active">施工事例</a>
+      <a href="index.html#flow">ご依頼の流れ</a>
+      <a href="index.html#company">会社概要</a>
+      <a href="index.html#contact">お問い合わせ</a>
+    </nav>
+    <div class="nav-cta">
+      <a href="index.html#contact" class="btn btn-primary">お見積もり</a>
+      <button class="menu-btn" id="menuBtn" aria-label="メニュー">☰</button>
+    </div>
+  </div>
+</header>
+
+<!-- ============ PAGE HERO ============ -->
+<div class="page-hero">
+  <div class="wrap">
+    <span class="kicker">Works</span>
+    <h1>施工事例</h1>
+    <p>これまでに手がけた溶接・金属加工・製作の事例をご紹介します。気になる事例があれば、お気軽にお問い合わせください。</p>
+    <div class="crumbs"><a href="index.html#top">ホーム</a> ／ 施工事例</div>
+  </div>
+</div>
+
+<!-- ============ GALLERY ============ -->
+<div class="wrap">
+  <!-- カテゴリ絞り込み -->
+  <div class="filters" id="filters">
+    <button class="filter active" data-cat="all">すべて</button>
+    <button class="filter" data-cat="welding">溶接</button>
+    <button class="filter" data-cat="fab">製缶・架台</button>
+    <button class="filter" data-cat="order">オーダー製作</button>
+    <button class="filter" data-cat="repair">補修・修理</button>
+  </div>
+
+  <!--
+    ▼ 写真の追加方法 ▼
+    各 .item の .thumb の中身を、プレースホルダー文言から下記のように差し替えてください：
+      <img src="works/写真ファイル名.jpg" alt="事例の説明">
+    data-cat はカテゴリ（welding / fab / order / repair）に合わせて変更します。
+    item はコピー＆ペーストでいくつでも増やせます。
+  -->
+  <div class="gallery" id="gallery">
+
+    <div class="item reveal" data-cat="fab">
+      <div class="thumb">施工写真をここに<span class="badge">製缶・架台</span></div>
+      <div class="body"><h3>ステンレス製架台の製作</h3><p>図面をもとに製作した架台。耐久性と美観を両立しました。</p></div>
+    </div>
+
+    <div class="item reveal" data-cat="welding">
+      <div class="thumb">施工写真をここに<span class="badge">溶接</span></div>
+      <div class="body"><h3>ステンレスTIG溶接</h3><p>薄板の精密溶接。歪みを抑えた美しいビードに仕上げました。</p></div>
+    </div>
+
+    <div class="item reveal" data-cat="welding">
+      <div class="thumb">施工写真をここに<span class="badge">溶接</span></div>
+      <div class="body"><h3>アルミ溶接</h3><p>難易度の高いアルミ材の溶接にも対応しています。</p></div>
+    </div>
+
+    <div class="item reveal" data-cat="order">
+      <div class="thumb">施工写真をここに<span class="badge">オーダー製作</span></div>
+      <div class="body"><h3>オーダー什器・看板</h3><p>店舗用のオリジナル什器を一品物で製作しました。</p></div>
+    </div>
+
+    <div class="item reveal" data-cat="fab">
+      <div class="thumb">施工写真をここに<span class="badge">製缶・架台</span></div>
+      <div class="body"><h3>鉄骨フレーム製作</h3><p>強度計算に基づいた頑丈なフレームを製作。</p></div>
+    </div>
+
+    <div class="item reveal" data-cat="repair">
+      <div class="thumb">施工写真をここに<span class="badge">補修・修理</span></div>
+      <div class="body"><h3>設備の現場補修</h3><p>出張対応での溶接補修。稼働を止めずに修理しました。</p></div>
+    </div>
+
+    <div class="item reveal" data-cat="order">
+      <div class="thumb">施工写真をここに<span class="badge">オーダー製作</span></div>
+      <div class="body"><h3>インテリア金物</h3><p>住宅用のオリジナルアイアン金物を製作しました。</p></div>
+    </div>
+
+    <div class="item reveal" data-cat="welding">
+      <div class="thumb">施工写真をここに<span class="badge">溶接</span></div>
+      <div class="body"><h3>鉄製品の溶接</h3><p>強度が求められる鉄製品をしっかり溶接しました。</p></div>
+    </div>
+
+    <div class="item reveal" data-cat="repair">
+      <div class="thumb">施工写真をここに<span class="badge">補修・修理</span></div>
+      <div class="body"><h3>農機具の修理</h3><p>壊れた農機具の溶接修理。コストを抑えて再生しました。</p></div>
+    </div>
+
+  </div>
+  <div class="empty-note" id="emptyNote" style="display:none;">該当する事例がありません。</div>
+</div>
+
+<!-- ============ CTA ============ -->
+<section>
+  <div class="wrap">
+    <div class="cta reveal">
+      <h2>「こんなもの作れる？」をまず相談</h2>
+      <p>掲載事例以外のご相談も大歓迎です。お見積もり・ご相談は無料です。</p>
+      <a href="index.html#contact" class="btn btn-white">無料相談・お見積もり →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a href="index.html#top" class="logo"><img src="logo.png" alt="Heroes Worker"></a>
+        <p>その一手間に、職人の誇りを。溶接・金属加工のことなら Heroes Worker におまかせください。</p>
+      </div>
+      <div class="foot-cols">
+        <div class="foot-col">
+          <h4>Menu</h4>
+          <a href="index.html#services">事業内容</a>
+          <a href="index.html#strengths">強み</a>
+          <a href="works.html">施工事例</a>
+          <a href="index.html#company">会社概要</a>
+        </div>
+        <div class="foot-col">
+          <h4>Contact</h4>
+          <a href="index.html#contact">お問い合わせ</a>
+          <a href="tel:0000000000">000-0000-0000</a>
+          <a href="mailto:info@example.com">info@example.com</a>
+        </div>
+      </div>
+    </div>
+    <div class="foot-bottom">© 2026 Heroes Worker. All Rights Reserved.</div>
+  </div>
+</footer>
+
+<!-- ============ LIGHTBOX ============ -->
+<div class="lightbox" id="lightbox">
+  <button class="lb-close" id="lbClose" aria-label="閉じる">×</button>
+  <div class="lb-inner">
+    <div class="lb-stage" id="lbStage"></div>
+    <div class="lb-cap"><div class="t" id="lbTitle"></div><div class="d" id="lbDesc"></div></div>
+  </div>
+</div>
+
+<script>
+  // モバイルメニュー
+  const menuBtn = document.getElementById('menuBtn');
+  const navLinks = document.getElementById('navLinks');
+  menuBtn.addEventListener('click', () => navLinks.classList.toggle('open'));
+  navLinks.querySelectorAll('a').forEach(a => a.addEventListener('click', () => navLinks.classList.remove('open')));
+
+  // カテゴリ絞り込み
+  const filters = document.getElementById('filters');
+  const items = Array.from(document.querySelectorAll('#gallery .item'));
+  const emptyNote = document.getElementById('emptyNote');
+  filters.addEventListener('click', (e) => {
+    const btn = e.target.closest('.filter');
+    if (!btn) return;
+    filters.querySelectorAll('.filter').forEach(f => f.classList.remove('active'));
+    btn.classList.add('active');
+    const cat = btn.dataset.cat;
+    let shown = 0;
+    items.forEach(it => {
+      const ok = cat === 'all' || it.dataset.cat === cat;
+      it.classList.toggle('hide', !ok);
+      if (ok) shown++;
+    });
+    emptyNote.style.display = shown ? 'none' : 'block';
+  });
+
+  // ライトボックス（写真拡大表示）
+  const lb = document.getElementById('lightbox');
+  const lbStage = document.getElementById('lbStage');
+  const lbTitle = document.getElementById('lbTitle');
+  const lbDesc = document.getElementById('lbDesc');
+  items.forEach(it => it.addEventListener('click', () => {
+    const thumb = it.querySelector('.thumb');
+    const img = thumb.querySelector('img');
+    lbStage.innerHTML = img ? `<img src="${img.src}" alt="${img.alt}">` : '写真は準備中です';
+    lbTitle.textContent = it.querySelector('h3')?.textContent || '';
+    lbDesc.textContent = it.querySelector('.body p')?.textContent || '';
+    lb.classList.add('open');
+  }));
+  const closeLb = () => lb.classList.remove('open');
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', (e) => { if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLb(); });
+
+  // フェードイン
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+</body>
+</html>
