@@ -795,3 +795,10 @@ function addReward(){
 
 /* ---------- 起動 ---------- */
 render();
+
+/* ---------- PWA: Service Worker 登録（オフライン対応・ホーム画面に追加可能に） ---------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
