@@ -167,7 +167,7 @@ function render(){
 
 function renderTopbar(user){
   return `<div class="topbar">
-    <div class="logo"><img class="mark-img" src="mbb-logo.png" alt="MBB"><div><b>My Brain Bank</b><small>GCMBB｜グロースカレッジ</small></div></div>
+    <div class="logo"><img class="mark-img" src="assets/logo.png" alt="MBB"><div><b>My Brain Bank</b><small>GCMBB｜グロースカレッジ</small></div></div>
     <div class="spacer"></div>
     <span class="coin-pill"><span class="c">🪙</span><span>${fmtNum(balance(user))}</span></span>
     <span class="user-chip" data-act="profile">${escapeHtml(user)} ▾</span>
@@ -207,7 +207,7 @@ function renderLogin(){
   const names=Object.keys(DB.users);
   return `<div class="login-wrap"><div class="login-shell">
     <div class="login-hero">
-      <img class="logo-img" src="mbb-logo.png" alt="My Brain Bank">
+      <img class="logo-img" src="assets/logo.png" alt="My Brain Bank">
 
       <h1>My Brain Bank</h1>
       <p><b>GCMBB｜グロースカレッジ</b><br>動画で学んで、学びを投稿。<br>知識とFevaCOINが貯まる。当たる。</p>
