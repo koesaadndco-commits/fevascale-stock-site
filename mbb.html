@@ -8,6 +8,8 @@
 <title>My Brain Bank（GCMBB）｜グロースカレッジ 学んで貯まるFevaCOIN</title>
 <meta name="theme-color" content="#0f1c14">
 <meta name="apple-mobile-web-app-title" content="GCMBB">
+<link rel="icon" type="image/png" href="mbb-logo.png">
+<link rel="apple-touch-icon" href="mbb-logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -41,6 +43,7 @@
   }
   .topbar .logo { display:flex; align-items:center; gap:8px; font-weight:800; letter-spacing:.02em; }
   .topbar .logo .mark { font-size:22px; }
+  .topbar .logo .mark-img { width:38px; height:38px; border-radius:10px; object-fit:cover; display:block; box-shadow:0 2px 8px rgba(0,0,0,.4); }
   .topbar .logo b { font-size:16px; }
   .topbar .logo small { display:block; font-size:10px; color:#7dd3fc; font-weight:600; letter-spacing:.06em; margin-top:-2px; white-space:nowrap;}
   .topbar .spacer { flex: 1; }
@@ -103,6 +106,7 @@
   @keyframes fadeUp { from{ transform:translateY(14px); opacity:0;} to{ transform:translateY(0); opacity:1; } }
   .login-hero { text-align:center; color:#fff; margin-bottom:22px; }
   .login-hero .coinbig { font-size:54px; filter:drop-shadow(0 6px 18px rgba(251,191,36,.5)); }
+  .login-hero .logo-img { width:128px; height:128px; border-radius:28px; object-fit:cover; display:inline-block; box-shadow:0 10px 30px rgba(0,0,0,.5); }
   .login-hero h1 { font-size:24px; font-weight:800; margin-top:6px; letter-spacing:.02em; }
   .login-hero p { color:#9fb3cc; font-size:13px; margin-top:6px; }
   .login-card { background:#fff; border-radius:18px; padding:20px; box-shadow:0 20px 50px rgba(0,0,0,.4); }
@@ -397,7 +401,7 @@ function render(){
 
 function renderTopbar(user){
   return `<div class="topbar">
-    <div class="logo"><span class="mark">🧠</span><div><b>My Brain Bank</b><small>GCMBB｜グロースカレッジ</small></div></div>
+    <div class="logo"><img class="mark-img" src="mbb-logo.png" alt="MBB"><div><b>My Brain Bank</b><small>GCMBB｜グロースカレッジ</small></div></div>
     <div class="spacer"></div>
     <span class="coin-pill"><span class="c">🪙</span><span>${fmtNum(balance(user))}</span></span>
     <span class="user-chip" data-act="profile">${escapeHtml(user)} ▾</span>
@@ -437,7 +441,8 @@ function renderLogin(){
   const names=Object.keys(DB.users);
   return `<div class="login-wrap"><div class="login-shell">
     <div class="login-hero">
-      <div class="coinbig">🧠</div>
+      <img class="logo-img" src="mbb-logo.png" alt="My Brain Bank">
+
       <h1>My Brain Bank</h1>
       <p><b>GCMBB｜グロースカレッジ</b><br>動画で学んで、学びを投稿。<br>知識とFevaCOINが貯まる。当たる。</p>
     </div>
