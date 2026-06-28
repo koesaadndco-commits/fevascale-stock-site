@@ -46,7 +46,16 @@ create table if not exists fc_redemptions (
   created_at timestamptz default now()
 );
 
--- 設定(コース/景品/ルール)は app_config(key,value) に JSON で保存すると既存と統一できます。
+-- 設定（コース／景品／コインルール）は1行のJSONで保持します。
+create table if not exists fc_config (
+  key text primary key,
+  value jsonb
+);
+
+-- ※ アクセス制御（RLS）について
+--   新規テーブルは既定でRLSが無効＝anonキーで読み書きできます（棚簡アプリと同じ方式）。
+--   社内限定の簡易運用ならこのままでOK。より厳密にしたい場合は各テーブルで
+--   alter table ... enable row level security; とポリシー追加を行ってください。
 
 -- ＜次のステップ案＞
 --  ・棚簡(index.html)のログイン(profiles/app_users)と連携して同じ社員IDで使う

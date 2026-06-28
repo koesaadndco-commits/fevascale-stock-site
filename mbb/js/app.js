@@ -93,6 +93,91 @@ function loadDB(){
 }
 function saveDB(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){ toast('保存に失敗しました','error'); } }
 
+/* ============================ Remote（Supabase 共有同期） ============================
+   Supabaseが使えれば全社共有、使えなければ自動でローカル(localStorage)のみ。
+   ・起動時に全件ロード → 以後の変更は楽観的にローカル反映＋裏でSupabaseへupsert
+   ・home/feed/rank表示中は定期的に再取得して最新化
+   ================================================================================= */
+let syncStatus = 'local'; // 'local' | 'cloud'
+const Remote = (function(){
+  let sb=null;
+  // ---- ローカル⇔リモートの変換 ----
+  const toUser = (name)=>({ name, dept:(DB.users[name]||{}).dept||null, joined_at:(DB.users[name]||{}).joinedAt||new Date().toISOString() });
+  const fromUser = (r)=>[r.name, { dept:r.dept||'', joinedAt:r.joined_at }];
+  const toPost = (p)=>({ id:p.id, user_name:p.user, course_id:p.courseId, course_title:p.courseTitle, learn:p.learn, action:p.action, watch_min:p.watchMin, coins_awarded:p.coinsAwarded, likes:p.likes||[], created_at:p.createdAt });
+  const fromPost = (r)=>({ id:r.id, user:r.user_name, courseId:r.course_id, courseTitle:r.course_title, learn:r.learn, action:r.action, watchMin:r.watch_min, coinsAwarded:r.coins_awarded||0, likes:r.likes||[], createdAt:r.created_at });
+  const toLedger = (l)=>({ id:l.id, user_name:l.user, amount:l.amount, type:l.type, reason:l.reason, created_at:l.createdAt });
+  const fromLedger = (r)=>({ id:r.id, user:r.user_name, amount:r.amount, type:r.type, reason:r.reason, createdAt:r.created_at });
+  const toRedemption = (x)=>({ id:x.id, user_name:x.user, reward_id:x.rewardId, title:x.title, cost:x.cost, status:x.status, created_at:x.createdAt });
+  const fromRedemption = (r)=>({ id:r.id, user:r.user_name, rewardId:r.reward_id, title:r.title, cost:r.cost, status:r.status, createdAt:r.created_at });
+
+  function init(){
+    const cfg=window.GCMBB_CONFIG;
+    if(!cfg || !cfg.SUPABASE_URL || typeof supabase==='undefined' || !supabase.createClient) return false;
+    try{ sb=supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_KEY); return true; }catch(e){ sb=null; return false; }
+  }
+  async function probe(){
+    if(!sb) return false;
+    try{ const { error } = await sb.from('fc_users').select('name').limit(1); return !error; }catch(e){ return false; }
+  }
+  async function loadAll(){
+    if(!sb) return false;
+    try{
+      const [u,p,l,rd,cf] = await Promise.all([
+        sb.from('fc_users').select('*'),
+        sb.from('fc_posts').select('*'),
+        sb.from('fc_ledger').select('*'),
+        sb.from('fc_redemptions').select('*'),
+        sb.from('fc_config').select('*').eq('key','config').maybeSingle(),
+      ]);
+      if(u.error||p.error||l.error||rd.error) return false;
+      DB.users = Object.fromEntries((u.data||[]).map(fromUser));
+      DB.posts = (p.data||[]).map(fromPost);
+      DB.ledger = (l.data||[]).map(fromLedger);
+      DB.redemptions = (rd.data||[]).map(fromRedemption);
+      if(cf && cf.data && cf.data.value){ const base=freshDB().config; const v=cf.data.value;
+        DB.config = { courses:v.courses||base.courses, rewards:v.rewards||base.rewards, rules:Object.assign({}, base.rules, v.rules||{}) }; }
+      saveDB();
+      return true;
+    }catch(e){ return false; }
+  }
+  function up(table, row, conflict){ if(!sb||syncStatus!=='cloud') return; try{ sb.from(table).upsert([row], conflict?{onConflict:conflict}:undefined).then(()=>{}, ()=>{}); }catch(e){} }
+  function del(table, id){ if(!sb||syncStatus!=='cloud') return; try{ sb.from(table).delete().eq('id', id).then(()=>{}, ()=>{}); }catch(e){} }
+
+  return {
+    init, probe, loadAll,
+    available: ()=>!!sb && syncStatus==='cloud',
+    pushUser: (name)=> up('fc_users', toUser(name), 'name'),
+    pushPost: (p)=> up('fc_posts', toPost(p), 'id'),
+    pushLedger: (l)=> up('fc_ledger', toLedger(l), 'id'),
+    pushRedemption: (x)=> up('fc_redemptions', toRedemption(x), 'id'),
+    pushConfig: ()=> up('fc_config', { key:'config', value:{ courses:DB.config.courses, rewards:DB.config.rewards, rules:DB.config.rules } }, 'key'),
+  };
+})();
+
+let _poll=null;
+function startPolling(){
+  if(_poll) return;
+  _poll=setInterval(()=>{
+    if(syncStatus!=='cloud' || document.hidden) return;
+    if(document.querySelector('.modal-back')) return;
+    const ae=document.activeElement;
+    if(ae && ['INPUT','TEXTAREA','SELECT'].includes(ae.tagName)) return;
+    if(!['home','feed','rank'].includes(VIEW)) return;
+    Remote.loadAll().then(ok=>{ if(ok) render(); }).catch(()=>{});
+  }, 25000);
+}
+async function initSync(){
+  if(!Remote.init()) { syncStatus='local'; return; }
+  const ok = await Remote.probe();
+  if(!ok){ syncStatus='local'; render(); return; }
+  syncStatus='cloud';
+  await Remote.loadAll();
+  if(DB.currentUser && !DB.users[DB.currentUser]) DB.users[DB.currentUser]={ dept:'', joinedAt:new Date().toISOString() };
+  render();
+  startPolling();
+}
+
 /* ---------- 小物 ---------- */
 function uid(){ return Date.now().toString(36) + Math.floor(Math.random()*1e6).toString(36); }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -129,7 +214,10 @@ function levelOf(earned){
   return { ...cur, next, earned };
 }
 function addLedger(user, amount, type, reason){
-  DB.ledger.push({ id:uid(), user, amount, type, reason, createdAt:new Date().toISOString() });
+  const row={ id:uid(), user, amount, type, reason, createdAt:new Date().toISOString() };
+  DB.ledger.push(row);
+  Remote.pushLedger(row);
+  return row;
 }
 function postsByUser(user){ return DB.posts.filter(p=>p.user===user); }
 function postsToday(user){ const t=todayStr(); return DB.posts.filter(p=>p.user===user && todayStr(p.createdAt)===t); }
@@ -169,6 +257,7 @@ function renderTopbar(user){
   return `<div class="topbar">
     <div class="logo"><img class="mark-img" src="assets/logo.png" alt="MBB"><div><b>My Brain Bank</b><small>GCMBB｜グロースカレッジ</small></div></div>
     <div class="spacer"></div>
+    <span class="user-chip sync-chip ${syncStatus}" data-act="refresh" title="${syncStatus==='cloud'?'全社で共有中・タップで更新':'この端末内に保存中'}">${syncStatus==='cloud'?'☁️ 共有':'📵 端末'}</span>
     <span class="coin-pill"><span class="c">🪙</span><span>${fmtNum(balance(user))}</span></span>
     <span class="user-chip" data-act="profile">${escapeHtml(user)} ▾</span>
   </div>`;
@@ -635,7 +724,7 @@ function doSubmitPost(){
   DB.posts.push(post);
 
   if(!willPay){
-    saveDB();
+    saveDB(); Remote.pushPost(post);
     toast('投稿しました（本日のコイン付与上限に達したため記録のみ）','success');
     postDraftCourse=''; go('feed'); return;
   }
@@ -647,7 +736,7 @@ function doSubmitPost(){
   showGacha(r.base, streakBonus, (tier, total)=>{
     post.coinsAwarded=total;
     addLedger(user, total, 'post', `学び投稿（${courseTitle}）${tier.key!=='normal'?'・'+tier.label:''}`);
-    saveDB();
+    saveDB(); Remote.pushPost(post);
   });
   postDraftCourse='';
 }
@@ -660,7 +749,7 @@ function doLike(postId){
   if(p.likes.includes(me)){
     // いいね解除（コインは戻さない）
     p.likes=p.likes.filter(n=>n!==me);
-    saveDB(); render(); return;
+    saveDB(); Remote.pushPost(p); render(); return;
   }
   p.likes.push(me);
   // 送り手ボーナス（1日上限、自分の投稿には付与しない）
@@ -671,7 +760,7 @@ function doLike(postId){
   if(p.user!==me){
     addLedger(p.user, r.likeReceive, 'like-recv', `${me}さんからいいね`);
   }
-  saveDB(); render();
+  saveDB(); Remote.pushPost(p); render();
 }
 
 function doRedeem(rewardId){
@@ -680,8 +769,9 @@ function doRedeem(rewardId){
   if(balance(user)<rw.cost){ toast('コインが足りません','error'); return; }
   if(!confirm(`「${rw.title}」を 🪙${rw.cost} で交換しますか？`)) return;
   addLedger(user, -rw.cost, 'redeem', `景品交換：${rw.title}`);
-  DB.redemptions.push({ id:uid(), user, rewardId, title:rw.title, cost:rw.cost, status:'requested', createdAt:new Date().toISOString() });
-  saveDB(); render();
+  const redemption={ id:uid(), user, rewardId, title:rw.title, cost:rw.cost, status:'requested', createdAt:new Date().toISOString() };
+  DB.redemptions.push(redemption);
+  saveDB(); Remote.pushRedemption(redemption); render();
   toast('交換を申請しました！担当者の承認をお待ちください','success');
 }
 
@@ -720,7 +810,7 @@ function bind(){
     if(!name){ toast('お名前を入力してください','error'); return; }
     if(!DB.users[name]) DB.users[name]={ dept, joinedAt:new Date().toISOString() };
     else if(dept) DB.users[name].dept=dept;
-    DB.currentUser=name; saveDB(); VIEW='home'; render();
+    DB.currentUser=name; saveDB(); Remote.pushUser(name); VIEW='home'; render();
     toast(`ようこそ、${name}さん！`,'success');
   };
   const le=document.querySelector('[data-act="login-existing"]');
@@ -761,11 +851,16 @@ function handleAct(act, el, ev){
     case 'logout': if(confirm('ログアウトしますか？')){ DB.currentUser=null; saveDB(); VIEW='home'; render(); } break;
     case 'save-rules': saveRules(); break;
     case 'add-course': addCourse(); break;
-    case 'del-course': if(confirm('このテーマを削除しますか？')){ DB.config.courses=DB.config.courses.filter(c=>c.id!==id); saveDB(); render(); } break;
+    case 'del-course': if(confirm('このテーマを削除しますか？')){ DB.config.courses=DB.config.courses.filter(c=>c.id!==id); saveDB(); Remote.pushConfig(); render(); } break;
     case 'add-reward': addReward(); break;
-    case 'del-reward': if(confirm('この景品を削除しますか？')){ DB.config.rewards=DB.config.rewards.filter(r=>r.id!==id); saveDB(); render(); } break;
-    case 'red-status': { const rd=DB.redemptions.find(r=>r.id===id); if(rd){ rd.status=el.getAttribute('data-s'); saveDB(); render(); } break; }
+    case 'del-reward': if(confirm('この景品を削除しますか？')){ DB.config.rewards=DB.config.rewards.filter(r=>r.id!==id); saveDB(); Remote.pushConfig(); render(); } break;
+    case 'red-status': { const rd=DB.redemptions.find(r=>r.id===id); if(rd){ rd.status=el.getAttribute('data-s'); saveDB(); Remote.pushRedemption(rd); render(); } break; }
+    case 'refresh': doRefresh(); break;
   }
+}
+function doRefresh(){
+  if(!Remote.available()){ toast('この端末内に保存中（共有オフ）','error'); return; }
+  Remote.loadAll().then(ok=>{ render(); toast(ok?'最新の状態に更新しました':'更新に失敗しました', ok?'success':'error'); });
 }
 
 function saveRules(){
@@ -773,7 +868,7 @@ function saveRules(){
   const v=(idv)=>{ const n=parseInt(document.getElementById(idv).value,10); return isNaN(n)?null:n; };
   const map={ base:'cfg-base', streakBonusPer:'cfg-streak', likeGive:'cfg-likegive', likeReceive:'cfg-likerecv', postsPerDayCoin:'cfg-perday' };
   Object.entries(map).forEach(([k,idv])=>{ const n=v(idv); if(n!==null) r[k]=n; });
-  saveDB(); toast('コイン設定を保存しました','success');
+  saveDB(); Remote.pushConfig(); toast('コイン設定を保存しました','success');
 }
 function addCourse(){
   const icon=(document.getElementById('nc-icon').value||'📘').trim();
@@ -781,7 +876,7 @@ function addCourse(){
   const cat=(document.getElementById('nc-cat').value||'その他').trim();
   if(!title){ toast('テーマ名を入力してください','error'); return; }
   DB.config.courses.push({ id:'c-'+uid(), icon, title, cat, desc:'' });
-  saveDB(); render(); toast('テーマを追加しました','success');
+  saveDB(); Remote.pushConfig(); render(); toast('テーマを追加しました','success');
 }
 function addReward(){
   const icon=(document.getElementById('nr-icon').value||'🎁').trim();
@@ -790,11 +885,12 @@ function addReward(){
   if(!title){ toast('景品名を入力してください','error'); return; }
   if(isNaN(cost)||cost<=0){ toast('コストを入力してください','error'); return; }
   DB.config.rewards.push({ id:'r-'+uid(), icon, title, cost, desc:'' });
-  saveDB(); render(); toast('景品を追加しました','success');
+  saveDB(); Remote.pushConfig(); render(); toast('景品を追加しました','success');
 }
 
 /* ---------- 起動 ---------- */
 render();
+initSync(); // Supabaseが使えれば全社共有モードに切り替え、ダメならローカルのまま
 
 /* ---------- PWA: Service Worker 登録（オフライン対応・ホーム画面に追加可能に） ---------- */
 if ('serviceWorker' in navigator) {
