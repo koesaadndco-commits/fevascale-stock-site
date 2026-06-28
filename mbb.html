@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Feva College｜学んで貯まるFevaCOIN</title>
+<title>My Brain Bank（GCMBB）｜グロースカレッジ 学んで貯まるFevaCOIN</title>
 <meta name="theme-color" content="#0f1c14">
-<meta name="apple-mobile-web-app-title" content="Feva College">
+<meta name="apple-mobile-web-app-title" content="GCMBB">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -42,7 +42,7 @@
   .topbar .logo { display:flex; align-items:center; gap:8px; font-weight:800; letter-spacing:.02em; }
   .topbar .logo .mark { font-size:22px; }
   .topbar .logo b { font-size:16px; }
-  .topbar .logo small { display:block; font-size:10px; color:#7dd3fc; font-weight:600; letter-spacing:.14em; margin-top:-2px;}
+  .topbar .logo small { display:block; font-size:10px; color:#7dd3fc; font-weight:600; letter-spacing:.06em; margin-top:-2px; white-space:nowrap;}
   .topbar .spacer { flex: 1; }
   .coin-pill {
     display:inline-flex; align-items:center; gap:6px; font-weight:800;
@@ -229,7 +229,7 @@
 
 <script>
 /* =========================================================================
-   Feva College — 学んでFevaCOINを貯めよう
+   My Brain Bank（GCMBB）／グロースカレッジ — 学んでFevaCOINを貯めよう
    Growth College(growthcollege.jp)で動画学習 → 学びを投稿 → FevaCOINが
    「貯まる」＋ガチャで「当たる」個人向け学習リワードアプリ。
 
@@ -397,7 +397,7 @@ function render(){
 
 function renderTopbar(user){
   return `<div class="topbar">
-    <div class="logo"><span class="mark">🪙</span><div><b>Feva College</b><small>GROWTH COLLEGE</small></div></div>
+    <div class="logo"><span class="mark">🧠</span><div><b>My Brain Bank</b><small>GCMBB｜グロースカレッジ</small></div></div>
     <div class="spacer"></div>
     <span class="coin-pill"><span class="c">🪙</span><span>${fmtNum(balance(user))}</span></span>
     <span class="user-chip" data-act="profile">${escapeHtml(user)} ▾</span>
@@ -437,9 +437,9 @@ function renderLogin(){
   const names=Object.keys(DB.users);
   return `<div class="login-wrap"><div class="login-shell">
     <div class="login-hero">
-      <div class="coinbig">🪙</div>
-      <h1>Feva College</h1>
-      <p>動画で学んで、学びを投稿。<br>FevaCOINが貯まる・当たる。</p>
+      <div class="coinbig">🧠</div>
+      <h1>My Brain Bank</h1>
+      <p><b>GCMBB｜グロースカレッジ</b><br>動画で学んで、学びを投稿。<br>学びとFevaCOINが貯まる・当たる。</p>
     </div>
     <div class="login-card">
       ${names.length? `<label class="field">既存ユーザーで入る</label>
@@ -720,7 +720,7 @@ function viewProfile(){
       <button class="btn btn-ghost btn-block" data-act="logout">ログアウト</button>
     </div>
   </div>
-  <p class="muted small" style="text-align:center;">Feva College ・ データはこの端末に保存されています</p>`;
+  <p class="muted small" style="text-align:center;">My Brain Bank（GCMBB） ・ データはこの端末に保存されています</p>`;
 }
 
 /* ---------------- Admin ---------------- */
@@ -917,7 +917,7 @@ function doRedeem(rewardId){
 function exportData(){
   const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='feva-college-backup-'+todayStr()+'.json'; a.click();
+  a.download='mbb-backup-'+todayStr()+'.json'; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   toast('バックアップを書き出しました','success');
 }
