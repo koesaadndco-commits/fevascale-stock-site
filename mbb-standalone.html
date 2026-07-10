@@ -255,7 +255,8 @@
    ========================================================================= */
 
 const STORE_KEY = 'FEVA_COLLEGE_v1';
-const GROWTH_URL = 'https://www.growthcollege.jp';
+// グロースカレッジLMSのログイン画面（すべての動画の入口）
+const GROWTH_URL = 'https://lms.growthcollege.jp/auth/login';
 
 /* ---------- 初期データ（管理者が編集可能） ---------- */
 const SEED_COURSES = [
@@ -313,7 +314,7 @@ const SEED_STORES = [
   { id:'s-kanazawa', name:'金沢支店' },
   { id:'s-toyama',   name:'富山支店' },
 ];
-const DEFAULT_ADMIN = { passcode:'2580' }; // 管理者コンソールを開くパスコード（コンソールで変更可）
+const DEFAULT_ADMIN = { passcode:'2580', email:'' }; // 管理者コンソールのパスコード＋交換申請の通知先メール
 
 /* ---------- ストレージ ---------- */
 function freshDB(){
@@ -644,7 +645,7 @@ function viewHome(){
       : `<div style="font-size:30px;">📚</div><h2 style="justify-content:center;color:#92400e;">今日の学びを投稿しよう</h2><p class="muted">動画を1本見て、学びを投稿するとFevaCOINが当たる！</p>`}
     <div class="row" style="justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap;">
       <button class="btn btn-primary" data-go="post">✍️ 学びを投稿する</button>
-      <a class="btn btn-secondary" href="${GROWTH_URL}" target="_blank" rel="noopener">▶️ Growth Collegeで見る</a>
+      <a class="btn btn-secondary" href="${GROWTH_URL}" target="_blank" rel="noopener">▶️ グロースカレッジにログイン</a>
     </div>
   </div>
 
@@ -664,11 +665,11 @@ function viewHome(){
 function viewLearn(){
   const cats=[...new Set(DB.config.courses.map(c=>c.cat))];
   return `
-  <div class="sec-title">Growth College で学ぶ</div>
+  <div class="sec-title">グロースカレッジで学ぶ</div>
   <div class="card" style="background:linear-gradient(135deg,#11203b,#13294a);color:#fff;border-color:#1e3a5f;">
     <h2 style="color:#fff;">▶️ 動画を視聴 → 学びを投稿</h2>
-    <p style="color:#9fb3cc;font-size:13px;">下のテーマから興味のある動画を選び、Growth Collegeで視聴。見終わったら「このテーマで投稿」から学びを記録するとFevaCOINがもらえます。</p>
-    <a class="btn btn-primary" style="margin-top:12px;" href="${GROWTH_URL}" target="_blank" rel="noopener">Growth College を開く ↗</a>
+    <p style="color:#9fb3cc;font-size:13px;">まずグロースカレッジのログイン画面から入り、動画を視聴。見終わったら「学びを投稿」から記録するとFevaCOINがもらえます。</p>
+    <a class="btn btn-primary" style="margin-top:12px;" href="${GROWTH_URL}" target="_blank" rel="noopener">🔑 グロースカレッジにログイン ↗</a>
   </div>
   ${cats.map(cat=>`
     <div class="card">
@@ -1054,6 +1055,7 @@ function consoleRedeem(){
         <div><div>${escapeHtml(rd.user)} → ${escapeHtml(rd.title)} <span class="tag">${escapeHtml(userStoreName(rd.user)||'—')}</span></div>
           <div class="when">${timeAgo(rd.createdAt)} ・ -${fmtNum(rd.cost)}🪙</div></div>
         <div class="row" style="gap:6px;">
+          ${rd.status==='requested'?`<a class="btn btn-ghost btn-sm" href="${mailtoRedeem(rd)}" title="申請者への確認メールを作成">📧</a>`:''}
           ${rd.status!=='done'?`<button class="btn btn-secondary btn-sm" data-act="red-status" data-id="${rd.id}" data-s="${rd.status==='requested'?'approved':'done'}">${rd.status==='requested'?'承認':'完了'}</button>`:`<span class="badge green">完了</span>`}
         </div>
       </div>`).join('') : `<div class="empty">申請はありません</div>`}
@@ -1080,6 +1082,10 @@ function consoleSystem(){
     <div class="kv"><span class="k">管理パスコード変更</span>
       <input class="input" style="width:120px" id="sys-pass" type="text" placeholder="新パスコード">
       <button class="btn btn-secondary btn-sm" data-act="save-passcode">変更</button></div>
+    <div class="kv" style="align-items:flex-start;"><span class="k">交換申請の通知先メール</span>
+      <input class="input grow" style="min-width:180px" id="sys-email" type="email" value="${escapeHtml((DB.config.admin||{}).email||'')}" placeholder="admin@example.com">
+      <button class="btn btn-secondary btn-sm" data-act="save-email">保存</button></div>
+    <p class="muted small" style="margin:2px 0 6px;">設定すると、交換申請時に管理者宛のメール作成画面が自動で開きます（送信ボタンで通知）。</p>
     <div class="kv"><span class="k">同期状態</span><b>${syncStatus==='cloud'?'☁️ 全社共有（Supabase）':'📵 この端末のみ'}</b></div>
     <div class="divider"></div>
     <h3>🎰 ガチャ確率（JSON）</h3>
@@ -1224,6 +1230,29 @@ function doRedeem(rewardId){
   DB.redemptions.push(redemption);
   saveDB(); Remote.pushRedemption(redemption); render();
   toast('交換を申請しました！担当者の承認をお待ちください','success');
+  notifyRedeem(redemption); // 管理者へメール通知（設定時）
+}
+// 交換申請を管理者へメール通知（mailto：バックエンド不要）
+function mailtoRedeem(rd){
+  const to=(DB.config.admin||{}).email||'';
+  const subject=`【GCMBB】景品交換の申請：${rd.title}`;
+  const body=[
+    '努力の交換所で景品交換の申請がありました。',
+    '',
+    `申請者：${rd.user}`,
+    `店舗　：${userStoreName(rd.user)||'—'}`,
+    `景品　：${rd.title}`,
+    `消費コイン：${rd.cost} FevaCOIN`,
+    `申請日時：${new Date(rd.createdAt).toLocaleString('ja-JP')}`,
+    '',
+    'アプリの「管理者コンソール → 交換申請」から承認できます。',
+  ].join('\n');
+  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+function notifyRedeem(rd){
+  const to=(DB.config.admin||{}).email||'';
+  if(!to) return; // 通知先未設定なら何もしない（コンソールに残るのでOK）
+  try{ window.location.href=mailtoRedeem(rd); }catch(e){}
 }
 
 function exportData(){
@@ -1313,6 +1342,7 @@ function handleAct(act, el, ev){
     case 'save-rules': saveRules(); break;
     case 'save-gacha': saveGacha(); break;
     case 'save-passcode': savePasscode(); break;
+    case 'save-email': saveAdminEmail(); break;
     case 'add-course': addCourse(); break;
     case 'del-course': if(confirm('このテーマを削除しますか？')){ DB.config.courses=DB.config.courses.filter(c=>c.id!==id); saveDB(); Remote.pushConfig(); render(); } break;
     case 'add-reward': addReward(); break;
@@ -1361,6 +1391,10 @@ function savePasscode(){
   const v=(document.getElementById('sys-pass').value||'').trim();
   if(!v){ toast('新しいパスコードを入力してください','error'); return; }
   DB.config.admin.passcode=v; saveDB(); Remote.pushConfig(); toast('パスコードを変更しました','success'); render();
+}
+function saveAdminEmail(){
+  const v=(document.getElementById('sys-email').value||'').trim();
+  DB.config.admin.email=v; saveDB(); Remote.pushConfig(); toast(v?'通知先メールを保存しました':'通知先メールを空にしました','success');
 }
 function addStore(){
   const name=(document.getElementById('ns-name').value||'').trim();
