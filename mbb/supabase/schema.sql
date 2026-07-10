@@ -10,6 +10,7 @@
 
 create table if not exists fc_users (
   name text primary key,
+  store text,                 -- 所属店舗ID（config.stores）
   dept text,
   joined_at timestamptz default now()
 );
@@ -27,12 +28,16 @@ create table if not exists fc_posts (
   created_at timestamptz default now()
 );
 
+-- コイン台帳（全アプリ共有＝「努力の交換所」の残高の元）
+-- 他アプリ（棚簡など）も、このテーブルに app 列を自分の名前にして
+-- 付与レコードを insert すれば、GCMBBの残高に自動で合算されます。
 create table if not exists fc_ledger (
   id text primary key,
   user_name text references fc_users(name),
   amount int not null,
   type text,
   reason text,
+  app text default 'mbb',     -- コインの発生元アプリ（mbb / tanakan など）
   created_at timestamptz default now()
 );
 

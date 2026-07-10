@@ -62,16 +62,29 @@ const LEVELS = [
   { lv:6, name:'レジェンド', min:5000 },
 ];
 const AVATAR_COLORS = ['#ef4444','#f59e0b','#10b981','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316'];
+const SEED_STORES = [
+  { id:'s-honten',   name:'本店' },
+  { id:'s-kanazawa', name:'金沢支店' },
+  { id:'s-toyama',   name:'富山支店' },
+];
+const DEFAULT_ADMIN = { passcode:'2580' }; // 管理者コンソールを開くパスコード（コンソールで変更可）
 
 /* ---------- ストレージ ---------- */
 function freshDB(){
   return {
     currentUser: null,
-    users: {},        // name -> { dept, joinedAt }
+    users: {},        // name -> { store, storeName, dept, joinedAt }
     posts: [],        // { id, user, courseId, courseTitle, learn, action, watchMin, createdAt, likes:[name], coinsAwarded }
-    ledger: [],       // { id, user, amount, type, reason, createdAt }
+    ledger: [],       // { id, user, amount, type, reason, app, createdAt }
     redemptions: [],  // { id, user, rewardId, title, cost, status, createdAt }
-    config: { courses: deepCopy(SEED_COURSES), rewards: deepCopy(SEED_REWARDS), rules: deepCopy(SEED_RULES) },
+    config: {
+      courses: deepCopy(SEED_COURSES),
+      rewards: deepCopy(SEED_REWARDS),   // 各景品に store:'' (全社共通) or storeId
+      rules:   deepCopy(SEED_RULES),     // 全社共通のデフォルト
+      stores:  deepCopy(SEED_STORES),
+      storeRules: {},                    // { storeId: { base?, streakBonusPer?, ... } } 店舗別上書き
+      admin:   deepCopy(DEFAULT_ADMIN),
+    },
   };
 }
 function deepCopy(o){ return JSON.parse(JSON.stringify(o)); }
@@ -88,6 +101,9 @@ function loadDB(){
     d.config.courses = d.config.courses || base.config.courses;
     d.config.rewards = d.config.rewards || base.config.rewards;
     d.config.rules   = Object.assign({}, base.config.rules, d.config.rules || {});
+    d.config.stores  = d.config.stores || base.config.stores;
+    d.config.storeRules = d.config.storeRules || {};
+    d.config.admin   = Object.assign({}, base.config.admin, d.config.admin || {});
     return d;
   }catch(e){ return freshDB(); }
 }
@@ -102,12 +118,12 @@ let syncStatus = 'local'; // 'local' | 'cloud'
 const Remote = (function(){
   let sb=null;
   // ---- ローカル⇔リモートの変換 ----
-  const toUser = (name)=>({ name, dept:(DB.users[name]||{}).dept||null, joined_at:(DB.users[name]||{}).joinedAt||new Date().toISOString() });
-  const fromUser = (r)=>[r.name, { dept:r.dept||'', joinedAt:r.joined_at }];
+  const toUser = (name)=>({ name, store:(DB.users[name]||{}).store||null, dept:(DB.users[name]||{}).dept||null, joined_at:(DB.users[name]||{}).joinedAt||new Date().toISOString() });
+  const fromUser = (r)=>[r.name, { store:r.store||'', storeName:'', dept:r.dept||'', joinedAt:r.joined_at }];
   const toPost = (p)=>({ id:p.id, user_name:p.user, course_id:p.courseId, course_title:p.courseTitle, learn:p.learn, action:p.action, watch_min:p.watchMin, coins_awarded:p.coinsAwarded, likes:p.likes||[], created_at:p.createdAt });
   const fromPost = (r)=>({ id:r.id, user:r.user_name, courseId:r.course_id, courseTitle:r.course_title, learn:r.learn, action:r.action, watchMin:r.watch_min, coinsAwarded:r.coins_awarded||0, likes:r.likes||[], createdAt:r.created_at });
-  const toLedger = (l)=>({ id:l.id, user_name:l.user, amount:l.amount, type:l.type, reason:l.reason, created_at:l.createdAt });
-  const fromLedger = (r)=>({ id:r.id, user:r.user_name, amount:r.amount, type:r.type, reason:r.reason, createdAt:r.created_at });
+  const toLedger = (l)=>({ id:l.id, user_name:l.user, amount:l.amount, type:l.type, reason:l.reason, app:l.app||'mbb', created_at:l.createdAt });
+  const fromLedger = (r)=>({ id:r.id, user:r.user_name, amount:r.amount, type:r.type, reason:r.reason, app:r.app||'mbb', createdAt:r.created_at });
   const toRedemption = (x)=>({ id:x.id, user_name:x.user, reward_id:x.rewardId, title:x.title, cost:x.cost, status:x.status, created_at:x.createdAt });
   const fromRedemption = (r)=>({ id:r.id, user:r.user_name, rewardId:r.reward_id, title:r.title, cost:r.cost, status:r.status, createdAt:r.created_at });
 
@@ -136,7 +152,14 @@ const Remote = (function(){
       DB.ledger = (l.data||[]).map(fromLedger);
       DB.redemptions = (rd.data||[]).map(fromRedemption);
       if(cf && cf.data && cf.data.value){ const base=freshDB().config; const v=cf.data.value;
-        DB.config = { courses:v.courses||base.courses, rewards:v.rewards||base.rewards, rules:Object.assign({}, base.rules, v.rules||{}) }; }
+        DB.config = {
+          courses: v.courses||base.courses,
+          rewards: v.rewards||base.rewards,
+          rules:   Object.assign({}, base.rules, v.rules||{}),
+          stores:  v.stores||base.stores,
+          storeRules: v.storeRules||{},
+          admin:   Object.assign({}, base.admin, v.admin||{}),
+        }; }
       saveDB();
       return true;
     }catch(e){ return false; }
@@ -151,7 +174,7 @@ const Remote = (function(){
     pushPost: (p)=> up('fc_posts', toPost(p), 'id'),
     pushLedger: (l)=> up('fc_ledger', toLedger(l), 'id'),
     pushRedemption: (x)=> up('fc_redemptions', toRedemption(x), 'id'),
-    pushConfig: ()=> up('fc_config', { key:'config', value:{ courses:DB.config.courses, rewards:DB.config.rewards, rules:DB.config.rules } }, 'key'),
+    pushConfig: ()=> up('fc_config', { key:'config', value:{ courses:DB.config.courses, rewards:DB.config.rewards, rules:DB.config.rules, stores:DB.config.stores, storeRules:DB.config.storeRules, admin:DB.config.admin } }, 'key'),
   };
 })();
 
@@ -214,7 +237,7 @@ function levelOf(earned){
   return { ...cur, next, earned };
 }
 function addLedger(user, amount, type, reason){
-  const row={ id:uid(), user, amount, type, reason, createdAt:new Date().toISOString() };
+  const row={ id:uid(), user, amount, type, reason, app:'mbb', createdAt:new Date().toISOString() };
   DB.ledger.push(row);
   Remote.pushLedger(row);
   return row;
@@ -235,6 +258,27 @@ function streakOf(user){
   while(days.has(todayStr(d))){ streak++; d.setDate(d.getDate()-1); }
   return streak;
 }
+
+/* ---------- 店舗・ルール・管理者 ---------- */
+function storeList(){ return DB.config.stores || []; }
+function storeName(id){ const s=storeList().find(x=>x.id===id); return s?s.name:''; }
+function userStoreId(name){ const u=DB.users[name]||{}; return u.store||''; }
+function userStoreName(name){ const u=DB.users[name]||{}; return storeName(u.store) || u.storeName || u.dept || ''; }
+// 全社デフォルト＋店舗別上書きを合成したコインルール
+function effectiveRules(name){
+  const base=DB.config.rules||{};
+  const ov=(DB.config.storeRules||{})[userStoreId(name)]||{};
+  return Object.assign({}, base, ov);
+}
+// ユーザーが交換できる景品（全社共通＋自店舗）
+function rewardsForUser(name){
+  const sid=userStoreId(name);
+  return (DB.config.rewards||[]).filter(r=>!r.store || r.store===sid);
+}
+// 管理者コンソール
+let adminUnlocked=false;
+function isAdmin(){ return adminUnlocked; }
+const OVERRIDABLE_RULE_KEYS=['base','streakBonusPer','streakBonusMax','likeGive','likeGiveMax','likeReceive','postsPerDayCoin'];
 
 /* ---------- ルーティング ---------- */
 let VIEW = 'home';
@@ -270,7 +314,7 @@ function renderNav(){
     ['post','投稿','✍️'],
     ['feed','フィード','📰'],
     ['rank','ランキング','🏆'],
-    ['shop','交換','🎁'],
+    ['shop','交換所','🏪'],
   ];
   return `<div class="bottomnav">${items.map(([v,l,i])=>
     `<button data-go="${v}" class="${VIEW===v?'active':''}"><span class="i">${i}</span><span>${l}</span></button>`).join('')}</div>`;
@@ -285,7 +329,7 @@ function renderView(){
     case 'rank':   return viewRank();
     case 'shop':   return viewShop();
     case 'history':return viewHistory();
-    case 'admin':  return viewAdmin();
+    case 'console':return viewConsole();
     case 'profile':return viewProfile();
     default:       return viewHome();
   }
@@ -306,14 +350,19 @@ function renderLogin(){
         <div class="stack" style="margin-bottom:14px;">
           <select class="select" id="login-existing">
             <option value="">— 名前を選択 —</option>
-            ${names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}（${escapeHtml(DB.users[n].dept||'—')}）</option>`).join('')}
+            ${names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}（${escapeHtml(userStoreName(n)||'—')}）</option>`).join('')}
           </select>
           <button class="btn btn-dark btn-block" data-act="login-existing">この名前で入る</button>
         </div>
         <div class="divider"></div>`:''}
       <label class="field">はじめての方（名前を登録）</label>
       <div class="field-wrap"><input class="input" id="login-name" placeholder="お名前（例：山田 太郎）" autocomplete="off"></div>
-      <div class="field-wrap"><input class="input" id="login-dept" placeholder="部署・店舗（例：本店 / 営業）" autocomplete="off"></div>
+      <div class="field-wrap">
+        <select class="select" id="login-store">
+          <option value="">— 店舗を選択 —</option>
+          ${storeList().map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
+        </select>
+      </div>
       <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px;" data-act="login-new">はじめる 🚀</button>
       <p class="muted small" style="text-align:center;margin-top:12px;">データはこの端末に保存されます</p>
     </div>
@@ -398,7 +447,7 @@ function viewLearn(){
 let postDraftCourse='';
 function viewPost(){
   const courses=DB.config.courses;
-  const r=DB.config.rules;
+  const r=effectiveRules(DB.currentUser);
   return `
   <div class="sec-title">学びを投稿する</div>
   <div class="card">
@@ -443,7 +492,7 @@ function renderPostHTML(p){
     <div class="head">
       <div class="avatar" style="background:${avatarColor(p.user)}">${escapeHtml(initials(p.user))}</div>
       <div class="grow">
-        <div class="who">${escapeHtml(p.user)} <span class="meta">${escapeHtml((DB.users[p.user]&&DB.users[p.user].dept)||'')}</span></div>
+        <div class="who">${escapeHtml(p.user)} <span class="meta">${escapeHtml(userStoreName(p.user)||'')}</span></div>
         <div class="meta">${timeAgo(p.createdAt)}</div>
       </div>
     </div>
@@ -466,14 +515,16 @@ function viewFeed(){
 
 /* ---------------- Ranking ---------------- */
 let rankTab='month';
+let rankStore='all'; // 'all' | storeId
 function viewRank(){
   const me=DB.currentUser;
   const isMonth=rankTab==='month';
   const scope = isMonth ? ym() : null;
+  const inStore=(u)=> rankStore==='all' || userStoreId(u)===rankStore;
   // 集計
   const agg={};
-  DB.ledger.forEach(l=>{ if(l.amount<=0) return; if(scope && ym(l.createdAt)!==scope) return; agg[l.user]=(agg[l.user]||0)+l.amount; });
-  Object.keys(DB.users).forEach(u=>{ if(agg[u]===undefined) agg[u]=0; });
+  DB.ledger.forEach(l=>{ if(l.amount<=0) return; if(scope && ym(l.createdAt)!==scope) return; if(!inStore(l.user)) return; agg[l.user]=(agg[l.user]||0)+l.amount; });
+  Object.keys(DB.users).forEach(u=>{ if(inStore(u) && agg[u]===undefined) agg[u]=0; });
   const rows=Object.entries(agg).sort((a,b)=>b[1]-a[1]);
   const postAgg={};
   DB.posts.forEach(p=>{ if(scope && ym(p.createdAt)!==scope) return; postAgg[p.user]=(postAgg[p.user]||0)+1; });
@@ -485,47 +536,62 @@ function viewRank(){
     <button class="${isMonth?'active':''}" data-act="rank-tab" data-v="month">今月（${ym()}）</button>
     <button class="${!isMonth?'active':''}" data-act="rank-tab" data-v="all">通算</button>
   </div>
+  <div class="field-wrap" style="margin-bottom:12px;">
+    <select class="select" id="rank-store" data-act="rank-store">
+      <option value="all" ${rankStore==='all'?'selected':''}>🏢 全店舗</option>
+      ${storeList().map(s=>`<option value="${s.id}" ${rankStore===s.id?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+    </select>
+  </div>
   <div class="card">
     <table class="rk-table">
-      <thead><tr><th class="pos">順位</th><th>名前</th><th class="num">投稿</th><th class="num">獲得🪙</th></tr></thead>
+      <thead><tr><th class="pos">順位</th><th>名前</th><th>店舗</th><th class="num">投稿</th><th class="num">獲得🪙</th></tr></thead>
       <tbody>
         ${rows.length? rows.map(([u,c],i)=>`
           <tr class="${u===me?'me':''} ${i===0?'rk1':''}">
             <td class="pos">${medal(i)}</td>
             <td><span class="avatar" style="width:24px;height:24px;font-size:11px;display:inline-flex;vertical-align:middle;background:${avatarColor(u)}">${escapeHtml(initials(u))}</span> ${escapeHtml(u)}</td>
+            <td class="small muted">${escapeHtml(userStoreName(u)||'—')}</td>
             <td class="num">${postAgg[u]||0}</td>
             <td class="num">${fmtNum(c)}</td>
-          </tr>`).join('') : `<tr><td colspan="4" class="empty">データがありません</td></tr>`}
+          </tr>`).join('') : `<tr><td colspan="5" class="empty">データがありません</td></tr>`}
       </tbody>
     </table>
   </div>
-  <p class="muted small" style="text-align:center;">${isMonth?'今月':'通算'}に獲得したFevaCOINの合計で順位が決まります。</p>`;
+  <p class="muted small" style="text-align:center;">${isMonth?'今月':'通算'}・${rankStore==='all'?'全店舗':escapeHtml(storeName(rankStore))}で獲得したFevaCOINの合計で順位が決まります。</p>`;
 }
 
-/* ---------------- Shop / Redeem ---------------- */
+/* ---------------- 努力の交換所 / Redeem ---------------- */
 function viewShop(){
   const user=DB.currentUser, bal=balance(user);
   const myReds=DB.redemptions.filter(r=>r.user===user).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
   const stLabel=(s)=> s==='done'?'<span class="badge green">受け渡し済</span>': s==='approved'?'<span class="badge blue">承認済</span>':'<span class="badge gold">申請中</span>';
+  const rewards=rewardsForUser(user);
+  const earnedByApp={};
+  ledgerFor(user).forEach(l=>{ if(l.amount>0){ const a=l.app||'mbb'; earnedByApp[a]=(earnedByApp[a]||0)+l.amount; } });
+  const appLabel={ mbb:'📚 学び（GCMBB）', tanakan:'🏪 棚簡', store:'🏬 店舗' };
   return `
-  <div class="sec-title">コインを交換する</div>
-  <div class="card" style="text-align:center;background:linear-gradient(135deg,#fffbeb,#fef3c7);border-color:#fde68a;">
-    <div class="muted small">交換に使えるコイン</div>
-    <div style="font-size:34px;font-weight:800;color:#b45309;">🪙 ${fmtNum(bal)}</div>
+  <div class="sec-title">努力の交換所</div>
+  <div class="card" style="text-align:center;background:linear-gradient(135deg,#11203b,#13294a);border-color:#1e3a5f;color:#fff;">
+    <div style="color:#9fb3cc;font-size:13px;">交換に使えるFevaCOIN（全アプリ合算）</div>
+    <div style="font-size:38px;font-weight:800;color:#fde68a;">🪙 ${fmtNum(bal)}</div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px;">
+      ${Object.keys(earnedByApp).length? Object.entries(earnedByApp).map(([a,c])=>`<span class="badge" style="background:rgba(255,255,255,.1);color:#cbd5e1;">${appLabel[a]||a} ${fmtNum(c)}</span>`).join('') : ''}
+    </div>
+    <div style="color:#7e93b0;font-size:11px;margin-top:8px;">🔗 他アプリで貯めたコインもここに合算され、どのアプリからも同じ残高で交換できます。</div>
   </div>
   <div class="card">
-    <h2>🎁 景品カタログ</h2>
-    ${DB.config.rewards.map(r=>{
+    <h2>🎁 景品カタログ ${userStoreName(user)?`<span class="tag">${escapeHtml(userStoreName(user))}</span>`:''}</h2>
+    ${rewards.length? rewards.map(r=>{
       const can=bal>=r.cost;
       return `<div class="reward">
         <div class="ic">${r.icon||'🎁'}</div>
-        <div class="body"><div class="t">${escapeHtml(r.title)}</div><div class="muted small">${escapeHtml(r.desc||'')}</div></div>
+        <div class="body"><div class="t">${escapeHtml(r.title)} ${r.store?`<span class="tag">${escapeHtml(storeName(r.store))}限定</span>`:''}</div><div class="muted small">${escapeHtml(r.desc||'')}</div></div>
         <div style="text-align:right;">
           <div class="cost">🪙 ${fmtNum(r.cost)}</div>
           <button class="btn ${can?'btn-primary':'btn-secondary'} btn-sm" style="margin-top:6px;" data-act="redeem" data-id="${r.id}" ${can?'':'disabled'}>${can?'交換':'コイン不足'}</button>
         </div>
       </div>`;
-    }).join('')}
+    }).join('') : `<div class="empty">交換できる景品がまだありません（管理者コンソールで追加できます）</div>`}
   </div>
   <div class="card">
     <h2>📋 交換履歴</h2>
@@ -562,7 +628,15 @@ function viewProfile(){
   <div class="sec-title">マイページ</div>
   <div class="card">
     <div class="row"><div class="avatar" style="width:54px;height:54px;font-size:20px;background:${avatarColor(user)}">${escapeHtml(initials(user))}</div>
-      <div><div style="font-weight:800;font-size:18px;">${escapeHtml(user)}</div><div class="muted">${escapeHtml((DB.users[user]&&DB.users[user].dept)||'部署未設定')}</div></div></div>
+      <div><div style="font-weight:800;font-size:18px;">${escapeHtml(user)}</div><div class="muted">🏬 ${escapeHtml(userStoreName(user)||'店舗未設定')}</div></div></div>
+    <div class="divider"></div>
+    <div class="field-wrap">
+      <label class="field">店舗を変更</label>
+      <select class="select" id="prof-store" data-act="prof-store">
+        <option value="">— 未設定 —</option>
+        ${storeList().map(s=>`<option value="${s.id}" ${userStoreId(user)===s.id?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+      </select>
+    </div>
     <div class="divider"></div>
     <div class="kv"><span class="k">残高</span><b>🪙 ${fmtNum(balance(user))}</b></div>
     <div class="kv"><span class="k">累計獲得</span><b>🪙 ${fmtNum(totalEarned(user))}</b></div>
@@ -573,7 +647,7 @@ function viewProfile(){
   <div class="card">
     <h3>設定・データ</h3>
     <div class="stack">
-      <button class="btn btn-secondary btn-block" data-act="admin">⚙️ 管理（コース・景品・コイン設定）</button>
+      <button class="btn btn-dark btn-block" data-act="console-open">🔐 管理者コンソール</button>
       <button class="btn btn-secondary btn-block" data-act="export">⬇️ データをエクスポート（バックアップ）</button>
       <label class="btn btn-secondary btn-block" style="position:relative;overflow:hidden;">⬆️ データをインポート
         <input type="file" id="import-file" accept="application/json" style="position:absolute;inset:0;opacity:0;cursor:pointer;"></label>
@@ -583,25 +657,132 @@ function viewProfile(){
   <p class="muted small" style="text-align:center;">My Brain Bank（GCMBB） ・ データはこの端末に保存されています</p>`;
 }
 
-/* ---------------- Admin ---------------- */
-function viewAdmin(){
-  const r=DB.config.rules;
+/* ---------------- 管理者コンソール ---------------- */
+let consoleTab='coins';
+function viewConsole(){
+  if(!isAdmin()) return consoleLockScreen();
+  const tabs=[['coins','🪙 コイン'],['rewards','🎁 景品'],['stores','🏬 店舗'],['courses','📘 コース'],['redeem','📨 交換申請'],['users','👥 メンバー'],['system','⚙️ システム']];
   return `
-  <div class="sec-title">管理</div>
+  <div class="sec-title">🔐 管理者コンソール</div>
+  <div class="console-tabs">
+    ${tabs.map(([k,l])=>`<button class="${consoleTab===k?'active':''}" data-act="console-tab" data-v="${k}">${l}</button>`).join('')}
+  </div>
+  ${consoleSection()}
+  <button class="btn btn-ghost btn-block" style="margin-top:10px;" data-act="console-lock">🔒 コンソールを閉じる</button>`;
+}
+function consoleLockScreen(){
+  return `
+  <div class="sec-title">🔐 管理者コンソール</div>
+  <div class="card" style="text-align:center;">
+    <div style="font-size:40px;">🔒</div>
+    <h2 style="justify-content:center;">管理パスコードを入力</h2>
+    <p class="muted small">店舗・景品・コイン設定などを変更できます。</p>
+    <div class="field-wrap" style="max-width:220px;margin:14px auto 0;">
+      <input class="input" id="console-pass" type="password" inputmode="numeric" placeholder="パスコード" style="text-align:center;letter-spacing:.3em;">
+    </div>
+    <button class="btn btn-primary" style="margin-top:12px;" data-act="console-unlock">開く</button>
+    <div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="profile">← 戻る</button></div>
+  </div>`;
+}
+function consoleSection(){
+  switch(consoleTab){
+    case 'coins':   return consoleCoins();
+    case 'rewards': return consoleRewards();
+    case 'stores':  return consoleStores();
+    case 'courses': return consoleCourses();
+    case 'redeem':  return consoleRedeem();
+    case 'users':   return consoleUsers();
+    case 'system':  return consoleSystem();
+    default:        return consoleCoins();
+  }
+}
+let cfgStore=''; // コイン設定の対象店舗（''=全社デフォルト）
+function consoleCoins(){
+  const r=DB.config.rules;
+  const isGlobal=!cfgStore;
+  const ov=(DB.config.storeRules||{})[cfgStore]||{};
+  const val=(k)=> isGlobal ? r[k] : (ov[k]!==undefined?ov[k]:'');
+  const ph=(k)=> isGlobal ? '' : `全社:${r[k]}`;
+  const rowF=(k,label,unit)=>`<div class="kv"><span class="k">${label}</span><input class="input" style="width:96px" type="number" id="cfg-${k}" value="${val(k)}" placeholder="${ph(k)}">${unit||'🪙'}</div>`;
+  return `
   <div class="card">
     <h2>🪙 コイン設定</h2>
-    <div class="kv"><span class="k">投稿の基本付与</span><input class="input" style="width:90px" type="number" id="cfg-base" value="${r.base}">🪙</div>
-    <div class="kv"><span class="k">連続ボーナス/日</span><input class="input" style="width:90px" type="number" id="cfg-streak" value="${r.streakBonusPer}">🪙（上限${r.streakBonusMax}日）</div>
-    <div class="kv"><span class="k">いいね送信</span><input class="input" style="width:90px" type="number" id="cfg-likegive" value="${r.likeGive}">🪙（1日上限${r.likeGiveMax}）</div>
-    <div class="kv"><span class="k">いいね受信</span><input class="input" style="width:90px" type="number" id="cfg-likerecv" value="${r.likeReceive}">🪙</div>
-    <div class="kv"><span class="k">コイン付与の投稿/日</span><input class="input" style="width:90px" type="number" id="cfg-perday" value="${r.postsPerDayCoin}">投稿</div>
-    <button class="btn btn-primary btn-sm" style="margin-top:10px;" data-act="save-rules">設定を保存</button>
-    <p class="muted small" style="margin-top:8px;">ガチャ確率・景品・コース内容はこのHTML内の SEED 定義を編集してください（または下のJSONエクスポートで調整）。</p>
-  </div>
+    <div class="field-wrap">
+      <label class="field">設定対象</label>
+      <select class="select" id="cfg-store" data-act="cfg-store">
+        <option value="" ${isGlobal?'selected':''}>🏢 全社共通（デフォルト）</option>
+        ${storeList().map(s=>`<option value="${s.id}" ${cfgStore===s.id?'selected':''}>${escapeHtml(s.name)}（店舗別上書き）</option>`).join('')}
+      </select>
+    </div>
+    ${rowF('base','投稿の基本付与')}
+    ${rowF('streakBonusPer','連続ボーナス/日')}
+    ${rowF('streakBonusMax','連続ボーナス上限','日')}
+    ${rowF('likeGive','いいね送信')}
+    ${rowF('likeGiveMax','いいね送信の1日上限','回')}
+    ${rowF('likeReceive','いいね受信')}
+    ${rowF('postsPerDayCoin','コイン付与の投稿/日','投稿')}
+    <button class="btn btn-primary btn-sm" style="margin-top:10px;" data-act="save-rules">${isGlobal?'全社デフォルトを保存':escapeHtml(storeName(cfgStore))+'の設定を保存'}</button>
+    ${!isGlobal?`<button class="btn btn-ghost btn-sm" style="margin-top:10px;margin-left:6px;" data-act="clear-store-rules">この店舗の上書きを消す</button>`:''}
+    <p class="muted small" style="margin-top:8px;">${isGlobal?'全店舗の基準値です。':'空欄の項目は全社デフォルトが使われます。'}ガチャ確率は「システム」タブのJSONで調整できます。</p>
+  </div>`;
+}
+function consoleRewards(){
+  const scopeName=(r)=> r.store?storeName(r.store)+'限定':'全社共通';
+  return `
+  <div class="card">
+    <h2>🎁 景品の編集</h2>
+    ${(DB.config.rewards||[]).map(rw=>`<div class="reward" style="padding:10px 0;">
+      <div class="ic">${rw.icon||'🎁'}</div>
+      <div class="body"><div class="t">${escapeHtml(rw.title)} <span class="tag">${escapeHtml(scopeName(rw))}</span></div>
+        <div class="muted small">🪙${fmtNum(rw.cost)}${rw.desc?' ・ '+escapeHtml(rw.desc):''}</div></div>
+      <button class="btn btn-ghost btn-sm" data-act="del-reward" data-id="${rw.id}">削除</button>
+    </div>`).join('') || `<div class="empty">景品がありません</div>`}
+    <div class="divider"></div>
+    <h3>景品を追加</h3>
+    <div class="stack">
+      <div class="row" style="gap:6px;">
+        <input class="input" style="width:64px" id="nr-icon" placeholder="🎁" value="🎁">
+        <input class="input grow" id="nr-title" placeholder="景品名（例：Amazonギフト500円）">
+      </div>
+      <div class="row" style="gap:6px;">
+        <input class="input" style="width:110px" id="nr-cost" type="number" placeholder="コスト🪙">
+        <select class="select grow" id="nr-store">
+          <option value="">全社共通</option>
+          ${storeList().map(s=>`<option value="${s.id}">${escapeHtml(s.name)}限定</option>`).join('')}
+        </select>
+      </div>
+      <input class="input" id="nr-desc" placeholder="説明（任意）">
+    </div>
+    <button class="btn btn-secondary btn-sm" style="margin-top:8px;" data-act="add-reward">＋ 追加</button>
+  </div>`;
+}
+function consoleStores(){
+  return `
+  <div class="card">
+    <h2>🏬 店舗の管理</h2>
+    ${storeList().map(s=>{
+      const cnt=Object.keys(DB.users).filter(u=>userStoreId(u)===s.id).length;
+      return `<div class="row between" style="margin:8px 0;">
+        <input class="input grow" value="${escapeHtml(s.name)}" data-act="rename-store" data-id="${s.id}">
+        <span class="tag">${cnt}人</span>
+        <button class="btn btn-ghost btn-sm" data-act="del-store" data-id="${s.id}">削除</button>
+      </div>`;
+    }).join('') || `<div class="empty">店舗がありません</div>`}
+    <div class="divider"></div>
+    <h3>店舗を追加</h3>
+    <div class="row" style="gap:6px;">
+      <input class="input grow" id="ns-name" placeholder="店舗名（例：福井支店）">
+      <button class="btn btn-secondary btn-sm" data-act="add-store">＋ 追加</button>
+    </div>
+    <p class="muted small" style="margin-top:8px;">店舗名を変更すると、その場で反映されます（Enterまたはフォーカスを外すと保存）。</p>
+  </div>`;
+}
+function consoleCourses(){
+  return `
   <div class="card">
     <h2>📘 コース（学習テーマ）</h2>
     <div id="course-list">
-      ${DB.config.courses.map((c,i)=>`<div class="row" style="margin:6px 0;">
+      ${DB.config.courses.map(c=>`<div class="row" style="margin:6px 0;">
         <span style="font-size:18px;">${c.icon}</span>
         <span class="grow">${escapeHtml(c.title)} <span class="tag">${escapeHtml(c.cat)}</span></span>
         <button class="btn btn-ghost btn-sm" data-act="del-course" data-id="${c.id}">削除</button>
@@ -615,34 +796,58 @@ function viewAdmin(){
       <input class="input" style="width:120px" id="nc-cat" placeholder="カテゴリ">
     </div>
     <button class="btn btn-secondary btn-sm" style="margin-top:8px;" data-act="add-course">＋ 追加</button>
-  </div>
-  <div class="card">
-    <h2>🎁 景品</h2>
-    ${DB.config.rewards.map(rw=>`<div class="row" style="margin:6px 0;">
-      <span style="font-size:18px;">${rw.icon}</span>
-      <span class="grow">${escapeHtml(rw.title)} <span class="tag">🪙${rw.cost}</span></span>
-      <button class="btn btn-ghost btn-sm" data-act="del-reward" data-id="${rw.id}">削除</button>
-    </div>`).join('')}
-    <div class="divider"></div>
-    <h3>景品を追加</h3>
-    <div class="row" style="gap:6px;flex-wrap:wrap;">
-      <input class="input" style="width:64px" id="nr-icon" placeholder="🎁" value="🎁">
-      <input class="input grow" id="nr-title" placeholder="景品名">
-      <input class="input" style="width:100px" id="nr-cost" type="number" placeholder="コスト">
-    </div>
-    <button class="btn btn-secondary btn-sm" style="margin-top:8px;" data-act="add-reward">＋ 追加</button>
-  </div>
+  </div>`;
+}
+function consoleRedeem(){
+  const reds=[...DB.redemptions].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  return `
   <div class="card">
     <h2>📨 交換申請（全員）</h2>
-    ${DB.redemptions.length? [...DB.redemptions].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(rd=>`
+    ${reds.length? reds.map(rd=>`
       <div class="ledger-row">
-        <div><div>${escapeHtml(rd.user)} → ${escapeHtml(rd.title)}</div><div class="when">${timeAgo(rd.createdAt)} ・ -${rd.cost}🪙</div></div>
+        <div><div>${escapeHtml(rd.user)} → ${escapeHtml(rd.title)} <span class="tag">${escapeHtml(userStoreName(rd.user)||'—')}</span></div>
+          <div class="when">${timeAgo(rd.createdAt)} ・ -${fmtNum(rd.cost)}🪙</div></div>
         <div class="row" style="gap:6px;">
           ${rd.status!=='done'?`<button class="btn btn-secondary btn-sm" data-act="red-status" data-id="${rd.id}" data-s="${rd.status==='requested'?'approved':'done'}">${rd.status==='requested'?'承認':'完了'}</button>`:`<span class="badge green">完了</span>`}
         </div>
       </div>`).join('') : `<div class="empty">申請はありません</div>`}
-  </div>
-  <button class="btn btn-ghost btn-block" data-go="home">← ホームに戻る</button>`;
+  </div>`;
+}
+function consoleUsers(){
+  const users=Object.keys(DB.users).sort();
+  return `
+  <div class="card">
+    <h2>👥 メンバー（${users.length}人）</h2>
+    ${users.length? users.map(u=>`<div class="row between" style="margin:8px 0;gap:8px;">
+      <span class="grow"><span class="avatar" style="width:26px;height:26px;font-size:11px;display:inline-flex;vertical-align:middle;background:${avatarColor(u)}">${escapeHtml(initials(u))}</span> ${escapeHtml(u)} <span class="muted small">🪙${fmtNum(balance(u))}</span></span>
+      <select class="select" style="width:150px" data-act="user-store" data-id="${escapeHtml(u)}">
+        <option value="">未設定</option>
+        ${storeList().map(s=>`<option value="${s.id}" ${userStoreId(u)===s.id?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+      </select>
+    </div>`).join('') : `<div class="empty">メンバーがいません</div>`}
+  </div>`;
+}
+function consoleSystem(){
+  return `
+  <div class="card">
+    <h2>⚙️ システム</h2>
+    <div class="kv"><span class="k">管理パスコード変更</span>
+      <input class="input" style="width:120px" id="sys-pass" type="text" placeholder="新パスコード">
+      <button class="btn btn-secondary btn-sm" data-act="save-passcode">変更</button></div>
+    <div class="kv"><span class="k">同期状態</span><b>${syncStatus==='cloud'?'☁️ 全社共有（Supabase）':'📵 この端末のみ'}</b></div>
+    <div class="divider"></div>
+    <h3>🎰 ガチャ確率（JSON）</h3>
+    <textarea class="textarea" id="sys-gacha" style="font-family:monospace;font-size:12px;min-height:120px;">${escapeHtml(JSON.stringify(DB.config.rules.gacha,null,1))}</textarea>
+    <button class="btn btn-secondary btn-sm" style="margin-top:8px;" data-act="save-gacha">ガチャ設定を保存</button>
+    <div class="divider"></div>
+    <h3>💾 データ</h3>
+    <div class="stack">
+      <button class="btn btn-secondary btn-block" data-act="export">⬇️ エクスポート（バックアップ）</button>
+      <label class="btn btn-secondary btn-block" style="position:relative;overflow:hidden;">⬆️ インポート
+        <input type="file" id="import-file" accept="application/json" style="position:absolute;inset:0;opacity:0;cursor:pointer;"></label>
+    </div>
+    <p class="muted small" style="margin-top:8px;">🔗 「努力の交換所」のコインは全アプリ合算です。他アプリ（棚簡など）から fc_ledger に付与レコードを追加すると、ここに自動で合算されます（supabase/schema.sql 参照）。</p>
+  </div>`;
 }
 
 /* ============================ GACHA ============================ */
@@ -714,7 +919,7 @@ function doSubmitPost(){
   if(sel==='__free__'){ courseTitle=(document.getElementById('post-free').value||'').trim(); if(!courseTitle){ toast('テーマ名を入力してください','error'); return; } }
   else { const c=DB.config.courses.find(x=>x.id===sel); courseTitle=c?c.title:'その他'; }
 
-  const r=DB.config.rules;
+  const r=effectiveRules(user);
   const post={ id:uid(), user, courseId:sel, courseTitle, learn, action, watchMin:isNaN(min)?null:min, createdAt:new Date().toISOString(), likes:[], coinsAwarded:0 };
 
   // コイン付与は1日 postsPerDayCoin 件まで
@@ -745,7 +950,7 @@ function doLike(postId){
   const me=DB.currentUser;
   const p=DB.posts.find(x=>x.id===postId); if(!p) return;
   p.likes=p.likes||[];
-  const r=DB.config.rules;
+  const rMe=effectiveRules(me), rOwner=effectiveRules(p.user);
   if(p.likes.includes(me)){
     // いいね解除（コインは戻さない）
     p.likes=p.likes.filter(n=>n!==me);
@@ -753,12 +958,12 @@ function doLike(postId){
   }
   p.likes.push(me);
   // 送り手ボーナス（1日上限、自分の投稿には付与しない）
-  if(p.user!==me && likesGivenToday(me) < r.likeGiveMax){
-    addLedger(me, r.likeGive, 'like-give', 'いいねを送った');
+  if(p.user!==me && likesGivenToday(me) < rMe.likeGiveMax){
+    addLedger(me, rMe.likeGive, 'like-give', 'いいねを送った');
   }
   // 受け手ボーナス
   if(p.user!==me){
-    addLedger(p.user, r.likeReceive, 'like-recv', `${me}さんからいいね`);
+    addLedger(p.user, rOwner.likeReceive, 'like-recv', `${me}さんからいいね`);
   }
   saveDB(); Remote.pushPost(p); render();
 }
@@ -806,10 +1011,10 @@ function bind(){
   const ln=document.querySelector('[data-act="login-new"]');
   if(ln) ln.onclick=()=>{
     const name=(document.getElementById('login-name').value||'').trim();
-    const dept=(document.getElementById('login-dept').value||'').trim();
+    const store=(document.getElementById('login-store')||{}).value||'';
     if(!name){ toast('お名前を入力してください','error'); return; }
-    if(!DB.users[name]) DB.users[name]={ dept, joinedAt:new Date().toISOString() };
-    else if(dept) DB.users[name].dept=dept;
+    if(!DB.users[name]) DB.users[name]={ store, storeName:storeName(store), joinedAt:new Date().toISOString() };
+    else if(store){ DB.users[name].store=store; DB.users[name].storeName=storeName(store); }
     DB.currentUser=name; saveDB(); Remote.pushUser(name); VIEW='home'; render();
     toast(`ようこそ、${name}さん！`,'success');
   };
@@ -820,11 +1025,13 @@ function bind(){
     DB.currentUser=v; saveDB(); VIEW='home'; render();
   };
 
-  // generic data-act
+  // generic data-act（select/input は change、それ以外は click）
   document.querySelectorAll('[data-act]').forEach(el=>{
     const act=el.getAttribute('data-act');
     if(['login-new','login-existing'].includes(act)) return;
-    el.onclick=(ev)=>handleAct(act, el, ev);
+    const tag=el.tagName;
+    if(tag==='SELECT' || tag==='INPUT' || tag==='TEXTAREA'){ el.onchange=(ev)=>handleAct(act, el, ev); }
+    else { el.onclick=(ev)=>handleAct(act, el, ev); }
   });
 
   // ポスト課程プルダウン
@@ -840,23 +1047,42 @@ function handleAct(act, el, ev){
   const id=el.getAttribute('data-id');
   switch(act){
     case 'profile': go('profile'); break;
-    case 'admin': go('admin'); break;
     case 'submit-post': doSubmitPost(); break;
     case 'post-course': postDraftCourse=id; go('post'); break;
     case 'like': doLike(id); break;
     case 'redeem': doRedeem(id); break;
     case 'rank-tab': rankTab=el.getAttribute('data-v'); render(); break;
+    case 'rank-store': rankStore=el.value; render(); break;
     case 'gacha-close': closeModal(); go('home'); toast('コインを獲得しました！','success'); break;
     case 'export': exportData(); break;
-    case 'logout': if(confirm('ログアウトしますか？')){ DB.currentUser=null; saveDB(); VIEW='home'; render(); } break;
+    case 'logout': if(confirm('ログアウトしますか？')){ DB.currentUser=null; adminUnlocked=false; saveDB(); VIEW='home'; render(); } break;
+    case 'prof-store': { const u=DB.currentUser; DB.users[u].store=el.value; DB.users[u].storeName=storeName(el.value); saveDB(); Remote.pushUser(u); render(); toast('店舗を変更しました','success'); break; }
+    // --- コンソール ---
+    case 'console-open': go('console'); break;
+    case 'console-unlock': doConsoleUnlock(); break;
+    case 'console-lock': adminUnlocked=false; go('profile'); break;
+    case 'console-tab': consoleTab=el.getAttribute('data-v'); render(); break;
+    case 'cfg-store': cfgStore=el.value; render(); break;
+    case 'clear-store-rules': if(cfgStore){ delete DB.config.storeRules[cfgStore]; saveDB(); Remote.pushConfig(); render(); toast('店舗の上書きを消しました','success'); } break;
     case 'save-rules': saveRules(); break;
+    case 'save-gacha': saveGacha(); break;
+    case 'save-passcode': savePasscode(); break;
     case 'add-course': addCourse(); break;
     case 'del-course': if(confirm('このテーマを削除しますか？')){ DB.config.courses=DB.config.courses.filter(c=>c.id!==id); saveDB(); Remote.pushConfig(); render(); } break;
     case 'add-reward': addReward(); break;
     case 'del-reward': if(confirm('この景品を削除しますか？')){ DB.config.rewards=DB.config.rewards.filter(r=>r.id!==id); saveDB(); Remote.pushConfig(); render(); } break;
+    case 'add-store': addStore(); break;
+    case 'del-store': delStore(id); break;
+    case 'rename-store': renameStore(id, el.value); break;
+    case 'user-store': { const u=id; if(DB.users[u]){ DB.users[u].store=el.value; DB.users[u].storeName=storeName(el.value); saveDB(); Remote.pushUser(u); render(); } break; }
     case 'red-status': { const rd=DB.redemptions.find(r=>r.id===id); if(rd){ rd.status=el.getAttribute('data-s'); saveDB(); Remote.pushRedemption(rd); render(); } break; }
     case 'refresh': doRefresh(); break;
   }
+}
+function doConsoleUnlock(){
+  const v=(document.getElementById('console-pass')||{}).value||'';
+  if(v===String((DB.config.admin||{}).passcode||'')){ adminUnlocked=true; consoleTab='coins'; render(); toast('コンソールを開きました','success'); }
+  else toast('パスコードが違います','error');
 }
 function doRefresh(){
   if(!Remote.available()){ toast('この端末内に保存中（共有オフ）','error'); return; }
@@ -864,11 +1090,53 @@ function doRefresh(){
 }
 
 function saveRules(){
-  const r=DB.config.rules;
-  const v=(idv)=>{ const n=parseInt(document.getElementById(idv).value,10); return isNaN(n)?null:n; };
-  const map={ base:'cfg-base', streakBonusPer:'cfg-streak', likeGive:'cfg-likegive', likeReceive:'cfg-likerecv', postsPerDayCoin:'cfg-perday' };
-  Object.entries(map).forEach(([k,idv])=>{ const n=v(idv); if(n!==null) r[k]=n; });
-  saveDB(); Remote.pushConfig(); toast('コイン設定を保存しました','success');
+  const num=(k)=>{ const el=document.getElementById('cfg-'+k); if(!el) return undefined; const s=el.value.trim(); if(s==='') return ''; const n=parseInt(s,10); return isNaN(n)?undefined:n; };
+  if(!cfgStore){
+    // 全社デフォルト
+    OVERRIDABLE_RULE_KEYS.forEach(k=>{ const n=num(k); if(typeof n==='number') DB.config.rules[k]=n; });
+  } else {
+    // 店舗別上書き（空欄はデフォルトに従う＝上書きを消す）
+    const ov=Object.assign({}, DB.config.storeRules[cfgStore]||{});
+    OVERRIDABLE_RULE_KEYS.forEach(k=>{ const n=num(k); if(n==='') delete ov[k]; else if(typeof n==='number') ov[k]=n; });
+    if(Object.keys(ov).length) DB.config.storeRules[cfgStore]=ov; else delete DB.config.storeRules[cfgStore];
+  }
+  saveDB(); Remote.pushConfig(); toast('コイン設定を保存しました','success'); render();
+}
+function saveGacha(){
+  try{
+    const arr=JSON.parse(document.getElementById('sys-gacha').value);
+    if(!Array.isArray(arr)||!arr.length) throw new Error('配列で入力してください');
+    arr.forEach(t=>{ if(typeof t.w!=='number'||typeof t.bonus!=='number') throw new Error('w と bonus は数値で'); });
+    DB.config.rules.gacha=arr;
+    saveDB(); Remote.pushConfig(); toast('ガチャ設定を保存しました','success');
+  }catch(e){ toast('JSONエラー：'+e.message,'error'); }
+}
+function savePasscode(){
+  const v=(document.getElementById('sys-pass').value||'').trim();
+  if(!v){ toast('新しいパスコードを入力してください','error'); return; }
+  DB.config.admin.passcode=v; saveDB(); Remote.pushConfig(); toast('パスコードを変更しました','success'); render();
+}
+function addStore(){
+  const name=(document.getElementById('ns-name').value||'').trim();
+  if(!name){ toast('店舗名を入力してください','error'); return; }
+  DB.config.stores.push({ id:'s-'+uid(), name });
+  saveDB(); Remote.pushConfig(); render(); toast('店舗を追加しました','success');
+}
+function delStore(id){
+  const cnt=Object.keys(DB.users).filter(u=>userStoreId(u)===id).length;
+  if(!confirm(`この店舗を削除しますか？${cnt>0?`（所属${cnt}人は未設定になります）`:''}`)) return;
+  DB.config.stores=DB.config.stores.filter(s=>s.id!==id);
+  delete DB.config.storeRules[id];
+  Object.keys(DB.users).forEach(u=>{ if(DB.users[u].store===id){ DB.users[u].store=''; DB.users[u].storeName=''; Remote.pushUser(u); } });
+  saveDB(); Remote.pushConfig(); render(); toast('店舗を削除しました','success');
+}
+function renameStore(id, name){
+  const s=DB.config.stores.find(x=>x.id===id); if(!s) return;
+  name=(name||'').trim(); if(!name) return;
+  s.name=name;
+  // 表示名キャッシュも更新
+  Object.keys(DB.users).forEach(u=>{ if(DB.users[u].store===id) DB.users[u].storeName=name; });
+  saveDB(); Remote.pushConfig();
 }
 function addCourse(){
   const icon=(document.getElementById('nc-icon').value||'📘').trim();
@@ -882,9 +1150,11 @@ function addReward(){
   const icon=(document.getElementById('nr-icon').value||'🎁').trim();
   const title=(document.getElementById('nr-title').value||'').trim();
   const cost=parseInt(document.getElementById('nr-cost').value,10);
+  const store=(document.getElementById('nr-store')||{}).value||'';
+  const desc=(document.getElementById('nr-desc')||{}).value||'';
   if(!title){ toast('景品名を入力してください','error'); return; }
   if(isNaN(cost)||cost<=0){ toast('コストを入力してください','error'); return; }
-  DB.config.rewards.push({ id:'r-'+uid(), icon, title, cost, desc:'' });
+  DB.config.rewards.push({ id:'r-'+uid(), icon, title, cost, desc, store });
   saveDB(); Remote.pushConfig(); render(); toast('景品を追加しました','success');
 }
 
