@@ -8,7 +8,8 @@
    コメントに移行用のテーブル定義(SQL)を記載しています。
    ========================================================================= */
 
-const STORE_KEY = 'FEVA_COLLEGE_v1';
+const STORE_KEY = 'FEVA_COLLEGE_v2'; // ログイン方式(ID+パス)変更に伴い更新。旧v1データは自動で切替
+
 // グロースカレッジLMSのログイン画面（すべての動画の入口）
 const GROWTH_URL = 'https://lms.growthcollege.jp/auth/login';
 
@@ -116,6 +117,9 @@ function loadDB(){
     d.config.stores  = d.config.stores || base.config.stores;
     d.config.storeRules = d.config.storeRules || {};
     d.config.admin   = Object.assign({}, base.config.admin, d.config.admin || {});
+    // ログインID/パスを持つアカウントが1つも無ければ、初期メンバーを補完（ログイン不能を防止）
+    const hasLogin = Object.values(d.users).some(u=>u && u.loginId);
+    if(!hasLogin){ Object.assign(d.users, seedMembers()); }
     return d;
   }catch(e){ return freshDB(); }
 }
