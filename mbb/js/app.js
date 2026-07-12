@@ -947,6 +947,40 @@ function showGacha(base, streakBonus, onClose){
 }
 function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
 
+/* ---- アプリ内ダイアログ（標準のconfirm/promptはiframe内でブロックされるため自前実装） ---- */
+function uiConfirm(msg, okLabel){
+  return new Promise(res=>{
+    const root=document.getElementById('modal-root');
+    root.innerHTML=`<div class="modal-back"><div class="modal">
+      <div style="white-space:pre-wrap;font-weight:700;color:#1e293b;line-height:1.6;">${escapeHtml(msg)}</div>
+      <div class="row" style="gap:8px;margin-top:18px;">
+        <button class="btn btn-secondary grow" id="ui-cancel">キャンセル</button>
+        <button class="btn btn-primary grow" id="ui-ok">${escapeHtml(okLabel||'OK')}</button>
+      </div></div></div>`;
+    const close=(v)=>{ root.innerHTML=''; res(v); };
+    root.querySelector('#ui-ok').onclick=()=>close(true);
+    root.querySelector('#ui-cancel').onclick=()=>close(false);
+    root.querySelector('.modal-back').onclick=(e)=>{ if(e.target.classList.contains('modal-back')) close(false); };
+  });
+}
+function uiPrompt(msg, def){
+  return new Promise(res=>{
+    const root=document.getElementById('modal-root');
+    root.innerHTML=`<div class="modal-back"><div class="modal">
+      <div style="font-weight:700;color:#1e293b;margin-bottom:10px;">${escapeHtml(msg)}</div>
+      <input class="input" id="ui-input" value="${escapeHtml(def||'')}">
+      <div class="row" style="gap:8px;margin-top:18px;">
+        <button class="btn btn-secondary grow" id="ui-cancel">キャンセル</button>
+        <button class="btn btn-primary grow" id="ui-ok">OK</button>
+      </div></div></div>`;
+    const inp=root.querySelector('#ui-input'); setTimeout(()=>inp.focus(),0);
+    const close=(v)=>{ root.innerHTML=''; res(v); };
+    root.querySelector('#ui-ok').onclick=()=>close(inp.value);
+    root.querySelector('#ui-cancel').onclick=()=>close(null);
+    inp.onkeydown=(e)=>{ if(e.key==='Enter') close(inp.value); };
+  });
+}
+
 /* ============================ ACTIONS ============================ */
 function doSubmitPost(){
   const user=DB.currentUser;
@@ -1009,11 +1043,11 @@ function doLike(postId){
   saveDB(); Remote.pushPost(p); render();
 }
 
-function doRedeem(rewardId){
+async function doRedeem(rewardId){
   const user=DB.currentUser;
   const rw=DB.config.rewards.find(r=>r.id===rewardId); if(!rw) return;
   if(balance(user)<rw.cost){ toast('コインが足りません','error'); return; }
-  if(!confirm(`「${rw.title}」を 🪙${rw.cost} で交換しますか？`)) return;
+  if(!(await uiConfirm(`「${rw.title}」を 🪙${fmtCoin(rw.cost)} で交換しますか？`,'交換する'))) return;
   addLedger(user, -rw.cost, 'redeem', `景品交換：${rw.title}`);
   const redemption={ id:uid(), user, rewardId, title:rw.title, cost:rw.cost, status:'requested', createdAt:new Date().toISOString() };
   DB.redemptions.push(redemption);
@@ -1053,11 +1087,11 @@ function exportData(){
 }
 function importData(file){
   const reader=new FileReader();
-  reader.onload=()=>{
+  reader.onload=async()=>{
     try{
       const d=JSON.parse(reader.result);
       if(!d || typeof d!=='object' || !('ledger' in d)) throw new Error('形式が不正です');
-      if(!confirm('現在のデータを上書きします。よろしいですか？')) return;
+      if(!(await uiConfirm('現在のデータを上書きします。よろしいですか？','上書き'))) return;
       const keepUser=DB.currentUser;
       DB=d; if(!DB.currentUser) DB.currentUser=keepUser;
       saveDB(); render(); toast('インポートしました','success');
@@ -1116,7 +1150,7 @@ function handleAct(act, el, ev){
     case 'rank-store': rankStore=el.value; render(); break;
     case 'gacha-close': closeModal(); go('home'); toast('コインを獲得しました！','success'); break;
     case 'export': exportData(); break;
-    case 'logout': if(confirm('ログアウトしますか？')){ DB.currentUser=null; adminUnlocked=false; saveDB(); VIEW='home'; render(); } break;
+    case 'logout': doLogout(); break;
     case 'prof-store': { const u=DB.currentUser; DB.users[u].store=el.value; DB.users[u].storeName=storeName(el.value); saveDB(); Remote.pushUser(u); render(); toast('店舗を変更しました','success'); break; }
     // --- コンソール ---
     case 'console-open': go('console'); break;
@@ -1130,9 +1164,9 @@ function handleAct(act, el, ev){
     case 'save-passcode': savePasscode(); break;
     case 'save-email': saveAdminEmail(); break;
     case 'add-course': addCourse(); break;
-    case 'del-course': if(confirm('このテーマを削除しますか？')){ DB.config.courses=DB.config.courses.filter(c=>c.id!==id); saveDB(); Remote.pushConfig(); render(); } break;
+    case 'del-course': delCourse(id); break;
     case 'add-reward': addReward(); break;
-    case 'del-reward': if(confirm('この景品を削除しますか？')){ DB.config.rewards=DB.config.rewards.filter(r=>r.id!==id); saveDB(); Remote.pushConfig(); render(); } break;
+    case 'del-reward': delReward(id); break;
     case 'add-store': addStore(); break;
     case 'del-store': delStore(id); break;
     case 'rename-store': renameStore(id, el.value); break;
@@ -1149,6 +1183,15 @@ function doConsoleUnlock(){
   const v=(document.getElementById('console-pass')||{}).value||'';
   if(v===String((DB.config.admin||{}).passcode||'')){ adminUnlocked=true; consoleTab='coins'; render(); toast('コンソールを開きました','success'); }
   else toast('パスコードが違います','error');
+}
+async function doLogout(){
+  if(await uiConfirm('ログアウトしますか？','ログアウト')){ DB.currentUser=null; adminUnlocked=false; saveDB(); VIEW='home'; render(); }
+}
+async function delCourse(id){
+  if(await uiConfirm('このテーマを削除しますか？','削除')){ DB.config.courses=DB.config.courses.filter(c=>c.id!==id); saveDB(); Remote.pushConfig(); render(); }
+}
+async function delReward(id){
+  if(await uiConfirm('この景品を削除しますか？','削除')){ DB.config.rewards=DB.config.rewards.filter(r=>r.id!==id); saveDB(); Remote.pushConfig(); render(); }
 }
 function doRefresh(){
   if(!Remote.available()){ toast('この端末内に保存中（共有オフ）','error'); return; }
@@ -1200,14 +1243,14 @@ function addMember(){
   DB.users[name]={ name, loginId, password, store, storeName:storeName(store), role, joinedAt:new Date().toISOString() };
   saveDB(); Remote.pushUser(name); render(); toast(`${name}さんを追加しました`,'success');
 }
-function delMember(name){
-  if(!confirm(`「${name}」を削除しますか？（投稿・コイン履歴は残ります）`)) return;
+async function delMember(name){
+  if(!(await uiConfirm(`「${name}」を削除しますか？\n（投稿・コイン履歴は残ります）`,'削除'))) return;
   delete DB.users[name];
   if(DB.currentUser===name) DB.currentUser=null;
   saveDB(); render(); toast('メンバーを削除しました','success');
 }
-function resetPass(name){
-  const p=prompt(`「${name}」の新しいパスワードを入力`,'');
+async function resetPass(name){
+  const p=await uiPrompt(`「${name}」の新しいパスワード`,'');
   if(p===null) return;
   const np=String(p).trim(); if(!np){ toast('パスワードが空です','error'); return; }
   DB.users[name].password=np; saveDB(); Remote.pushUser(name); toast('パスワードを再設定しました','success');
@@ -1218,9 +1261,9 @@ function addStore(){
   DB.config.stores.push({ id:'s-'+uid(), name });
   saveDB(); Remote.pushConfig(); render(); toast('店舗を追加しました','success');
 }
-function delStore(id){
+async function delStore(id){
   const cnt=Object.keys(DB.users).filter(u=>userStoreId(u)===id).length;
-  if(!confirm(`この店舗を削除しますか？${cnt>0?`（所属${cnt}人は未設定になります）`:''}`)) return;
+  if(!(await uiConfirm(`この店舗を削除しますか？${cnt>0?`\n（所属${cnt}人は未設定になります）`:''}`,'削除'))) return;
   DB.config.stores=DB.config.stores.filter(s=>s.id!==id);
   delete DB.config.storeRules[id];
   Object.keys(DB.users).forEach(u=>{ if(DB.users[u].store===id){ DB.users[u].store=''; DB.users[u].storeName=''; Remote.pushUser(u); } });
