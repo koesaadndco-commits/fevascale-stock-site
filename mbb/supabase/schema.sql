@@ -10,6 +10,9 @@
 
 create table if not exists fc_users (
   name text primary key,
+  login_id text unique,       -- ログインID
+  password text,              -- ※プロトタイプ用（本番Next.js版ではハッシュ化して保存）
+  role text default 'member', -- member | admin
   store text,                 -- 所属店舗ID（config.stores）
   dept text,
   joined_at timestamptz default now()

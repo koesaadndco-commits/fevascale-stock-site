@@ -30,37 +30,39 @@ const SEED_COURSES = [
   { id:'c-share',  icon:'🔄', title:'学び共有・ナレッジ共有',  cat:'自己啓発',     desc:'学びをチームに伝える・横展開' },
 ];
 const SEED_REWARDS = [
-  { id:'r-amazon1k', icon:'🎁', title:'Amazonギフト 1,000円分', cost:500,  desc:'人気No.1' },
-  { id:'r-book',     icon:'📚', title:'図書カード 1,000円分',   cost:480,  desc:'学びを次の学びへ' },
-  { id:'r-lunch',    icon:'🍱', title:'ランチ補助券 1,000円',   cost:450,  desc:'お昼に使える' },
-  { id:'r-coffee',   icon:'☕', title:'カフェチケット 500円',   cost:240,  desc:'ちょっと一息' },
-  { id:'r-half',     icon:'🌴', title:'半休チケット',           cost:1500, desc:'頑張った自分にご褒美' },
-  { id:'r-award',    icon:'🏆', title:'社内表彰ノミネート',     cost:300,  desc:'全社で称賛' },
+  { id:'r-amazon1k', icon:'🎁', title:'Amazonギフト 1,000円分', cost:30, desc:'人気No.1' },
+  { id:'r-book',     icon:'📚', title:'図書カード 1,000円分',   cost:25, desc:'学びを次の学びへ' },
+  { id:'r-lunch',    icon:'🍱', title:'ランチ補助券 1,000円',   cost:25, desc:'お昼に使える' },
+  { id:'r-coffee',   icon:'☕', title:'カフェチケット 500円',   cost:12, desc:'ちょっと一息' },
+  { id:'r-half',     icon:'🌴', title:'半休チケット',           cost:60, desc:'頑張った自分にご褒美' },
+  { id:'r-award',    icon:'🏆', title:'社内表彰ノミネート',     cost:20, desc:'全社で称賛' },
 ];
 const SEED_RULES = {
-  base: 30,            // 学び投稿の基本付与
-  streakBonusPer: 5,   // 連続学習1日あたりのボーナス
-  streakBonusMax: 7,   // ボーナス対象の連続日数上限
-  likeGive: 1,         // いいねを送ると送り手に付与
-  likeGiveMax: 10,     // 1日にいいねで稼げる上限
-  likeReceive: 2,      // いいねされると投稿者に付与
+  base: 1,             // 学び投稿の基本付与（コイン）
+  streakBonusPer: 0.1, // 連続学習1日あたりのボーナス
+  streakBonusMax: 7,   // ボーナス対象の連続日数上限（日）
+  likeGive: 0.1,       // いいねを送ると送り手に付与
+  likeGiveMax: 10,     // 1日にいいねで稼げる回数上限
+  likeReceive: 0.2,    // いいねされると投稿者に付与
   postsPerDayCoin: 3,  // 1日にコイン付与される投稿数の上限
-  // ガチャ：投稿のたびに回る。tier=結果, w=重み, bonus=加算コイン
+  // ガチャ：投稿のたびに回る。0.1単位・最大2.0コイン。tier=結果, w=重み, bonus=加算コイン
   gacha: [
-    { key:'normal',  label:'ノーマル',     color:'#94a3b8', w:50, bonus:10 },
-    { key:'silver',  label:'シルバー',     color:'#64748b', w:25, bonus:30 },
-    { key:'gold',    label:'ゴールド',     color:'#d97706', w:15, bonus:50 },
-    { key:'rainbow', label:'レインボー',   color:'#7c3aed', w:8,  bonus:100 },
-    { key:'jackpot', label:'★ジャックポット★', color:'#dc2626', w:2, bonus:300 },
+    { key:'g01', label:'0.1コイン',  color:'#94a3b8', w:32, bonus:0.1 },
+    { key:'g02', label:'0.2コイン',  color:'#64748b', w:24, bonus:0.2 },
+    { key:'g03', label:'0.3コイン',  color:'#0ea5e9', w:18, bonus:0.3 },
+    { key:'g05', label:'0.5コイン',  color:'#d97706', w:13, bonus:0.5 },
+    { key:'g10', label:'1.0コイン',  color:'#7c3aed', w:8,  bonus:1.0 },
+    { key:'g15', label:'1.5コイン',  color:'#db2777', w:4,  bonus:1.5 },
+    { key:'g20', label:'★2コイン★', color:'#dc2626', w:1,  bonus:2.0 },
   ],
 };
 const LEVELS = [
   { lv:1, name:'見習い',     min:0 },
-  { lv:2, name:'学習者',     min:150 },
-  { lv:3, name:'実践者',     min:500 },
-  { lv:4, name:'達人',       min:1200 },
-  { lv:5, name:'マスター',   min:2500 },
-  { lv:6, name:'レジェンド', min:5000 },
+  { lv:2, name:'学習者',     min:10 },
+  { lv:3, name:'実践者',     min:30 },
+  { lv:4, name:'達人',       min:80 },
+  { lv:5, name:'マスター',   min:150 },
+  { lv:6, name:'レジェンド', min:300 },
 ];
 const AVATAR_COLORS = ['#ef4444','#f59e0b','#10b981','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316'];
 const SEED_STORES = [
@@ -68,13 +70,22 @@ const SEED_STORES = [
   { id:'s-kanazawa', name:'金沢支店' },
   { id:'s-toyama',   name:'富山支店' },
 ];
-const DEFAULT_ADMIN = { passcode:'2580', email:'' }; // 管理者コンソールのパスコード＋交換申請の通知先メール
+const DEFAULT_ADMIN = { passcode:'admin2564', email:'' }; // 管理者コンソールのパスコード＋交換申請の通知先メール
+// 初期メンバー（ID＋パスワードでログイン。以後はコンソールで追加）
+function seedMembers(){
+  const now=new Date().toISOString();
+  return {
+    '管理者':    { name:'管理者',    loginId:'admin',  password:'admin2564', store:'s-honten',   role:'admin',  joinedAt:now },
+    '山田 太郎': { name:'山田 太郎', loginId:'yamada', password:'1111',      store:'s-honten',   role:'member', joinedAt:now },
+    '佐藤 花子': { name:'佐藤 花子', loginId:'sato',   password:'1111',      store:'s-kanazawa', role:'member', joinedAt:now },
+  };
+}
 
 /* ---------- ストレージ ---------- */
 function freshDB(){
   return {
     currentUser: null,
-    users: {},        // name -> { store, storeName, dept, joinedAt }
+    users: seedMembers(),  // name -> { name, loginId, password, store, storeName, role, joinedAt }
     posts: [],        // { id, user, courseId, courseTitle, learn, action, watchMin, createdAt, likes:[name], coinsAwarded }
     ledger: [],       // { id, user, amount, type, reason, app, createdAt }
     redemptions: [],  // { id, user, rewardId, title, cost, status, createdAt }
@@ -119,8 +130,8 @@ let syncStatus = 'local'; // 'local' | 'cloud'
 const Remote = (function(){
   let sb=null;
   // ---- ローカル⇔リモートの変換 ----
-  const toUser = (name)=>({ name, store:(DB.users[name]||{}).store||null, dept:(DB.users[name]||{}).dept||null, joined_at:(DB.users[name]||{}).joinedAt||new Date().toISOString() });
-  const fromUser = (r)=>[r.name, { store:r.store||'', storeName:'', dept:r.dept||'', joinedAt:r.joined_at }];
+  const toUser = (name)=>{ const u=DB.users[name]||{}; return { name, login_id:u.loginId||null, password:u.password||null, role:u.role||'member', store:u.store||null, dept:u.dept||null, joined_at:u.joinedAt||new Date().toISOString() }; };
+  const fromUser = (r)=>[r.name, { name:r.name, loginId:r.login_id||'', password:r.password||'', role:r.role||'member', store:r.store||'', storeName:'', dept:r.dept||'', joinedAt:r.joined_at }];
   const toPost = (p)=>({ id:p.id, user_name:p.user, course_id:p.courseId, course_title:p.courseTitle, learn:p.learn, action:p.action, watch_min:p.watchMin, coins_awarded:p.coinsAwarded, likes:p.likes||[], created_at:p.createdAt });
   const fromPost = (r)=>({ id:r.id, user:r.user_name, courseId:r.course_id, courseTitle:r.course_title, learn:r.learn, action:r.action, watchMin:r.watch_min, coinsAwarded:r.coins_awarded||0, likes:r.likes||[], createdAt:r.created_at });
   const toLedger = (l)=>({ id:l.id, user_name:l.user, amount:l.amount, type:l.type, reason:l.reason, app:l.app||'mbb', created_at:l.createdAt });
@@ -208,7 +219,11 @@ function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':
 function nl2br(s){ return escapeHtml(s).replace(/\n/g,'<br>'); }
 function todayStr(d){ const x=d?new Date(d):new Date(); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
 function ym(d){ const x=d?new Date(d):new Date(); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'); }
-function fmtNum(n){ return Number(n||0).toLocaleString('ja-JP'); }
+function round1(n){ return Math.round((Number(n)||0)*10)/10; }
+// コイン表示（0.1単位。整数はそのまま、小数は1桁）
+function fmtCoin(n){ const r=round1(n); return Number.isInteger(r) ? r.toLocaleString('ja-JP') : r.toFixed(1); }
+// 旧来のコイン表示呼び出しも小数対応にする（呼び出し箇所はすべてコイン額）
+function fmtNum(n){ return fmtCoin(n); }
 function timeAgo(iso){
   const diff = (Date.now()-new Date(iso).getTime())/1000;
   if(diff<60) return 'たった今';
@@ -238,7 +253,7 @@ function levelOf(earned){
   return { ...cur, next, earned };
 }
 function addLedger(user, amount, type, reason){
-  const row={ id:uid(), user, amount, type, reason, app:'mbb', createdAt:new Date().toISOString() };
+  const row={ id:uid(), user, amount:round1(amount), type, reason, app:'mbb', createdAt:new Date().toISOString() };
   DB.ledger.push(row);
   Remote.pushLedger(row);
   return row;
@@ -338,7 +353,6 @@ function renderView(){
 
 /* ---------------- Login ---------------- */
 function renderLogin(){
-  const names=Object.keys(DB.users);
   return `<div class="login-wrap"><div class="login-shell">
     <div class="login-hero">
       <img class="logo-img" src="assets/logo.png" alt="My Brain Bank">
@@ -347,25 +361,12 @@ function renderLogin(){
       <p><b>GCMBB｜グロースカレッジ</b><br>動画で学んで、学びを投稿。<br>知識とFevaCOINが貯まる。当たる。</p>
     </div>
     <div class="login-card">
-      ${names.length? `<label class="field">既存ユーザーで入る</label>
-        <div class="stack" style="margin-bottom:14px;">
-          <select class="select" id="login-existing">
-            <option value="">— 名前を選択 —</option>
-            ${names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}（${escapeHtml(userStoreName(n)||'—')}）</option>`).join('')}
-          </select>
-          <button class="btn btn-dark btn-block" data-act="login-existing">この名前で入る</button>
-        </div>
-        <div class="divider"></div>`:''}
-      <label class="field">はじめての方（名前を登録）</label>
-      <div class="field-wrap"><input class="input" id="login-name" placeholder="お名前（例：山田 太郎）" autocomplete="off"></div>
-      <div class="field-wrap">
-        <select class="select" id="login-store">
-          <option value="">— 店舗を選択 —</option>
-          ${storeList().map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
-        </select>
-      </div>
-      <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px;" data-act="login-new">はじめる 🚀</button>
-      <p class="muted small" style="text-align:center;margin-top:12px;">データはこの端末に保存されます</p>
+      <label class="field">ログインID</label>
+      <div class="field-wrap"><input class="input" id="login-id" placeholder="ID（例：yamada）" autocomplete="username"></div>
+      <label class="field">パスワード</label>
+      <div class="field-wrap"><input class="input" id="login-pass" type="password" placeholder="パスワード" autocomplete="current-password"></div>
+      <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px;" data-act="login-idpass">ログイン 🔑</button>
+      <p class="muted small" style="text-align:center;margin-top:12px;">アカウントは管理者が発行します</p>
     </div>
   </div></div>`;
 }
@@ -477,7 +478,7 @@ function viewPost(){
       <input class="input" id="post-min" type="number" inputmode="numeric" min="0" placeholder="例：15">
     </div>
     <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px;font-size:13px;color:#92400e;margin-top:4px;">
-      投稿すると <b>基本 ${r.base}🪙</b> ＋ 連続学習ボーナス ＋ <b>コインガチャ</b>で最大 <b>${Math.max(...r.gacha.map(g=>g.bonus))}🪙</b> が当たる！
+      投稿すると <b>基本 ${fmtCoin(r.base)}🪙</b> ＋ 連続学習ボーナス ＋ <b>コインガチャ</b>で最大 <b>${fmtCoin(Math.max(...r.gacha.map(g=>g.bonus)))}🪙</b> が当たる！
     </div>
     <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px;" data-act="submit-post">🪙 投稿してコインを獲得</button>
     <p class="muted small" style="margin-top:8px;text-align:center;">コイン付与は1日 ${r.postsPerDayCoin} 投稿まで（それ以上は記録のみ）</p>
@@ -704,7 +705,7 @@ function consoleCoins(){
   const ov=(DB.config.storeRules||{})[cfgStore]||{};
   const val=(k)=> isGlobal ? r[k] : (ov[k]!==undefined?ov[k]:'');
   const ph=(k)=> isGlobal ? '' : `全社:${r[k]}`;
-  const rowF=(k,label,unit)=>`<div class="kv"><span class="k">${label}</span><input class="input" style="width:96px" type="number" id="cfg-${k}" value="${val(k)}" placeholder="${ph(k)}">${unit||'🪙'}</div>`;
+  const rowF=(k,label,unit)=>`<div class="kv"><span class="k">${label}</span><input class="input" style="width:96px" type="number" step="0.1" id="cfg-${k}" value="${val(k)}" placeholder="${ph(k)}">${unit||'🪙'}</div>`;
   return `
   <div class="card">
     <h2>🪙 コイン設定</h2>
@@ -820,13 +821,47 @@ function consoleUsers(){
   return `
   <div class="card">
     <h2>👥 メンバー（${users.length}人）</h2>
-    ${users.length? users.map(u=>`<div class="row between" style="margin:8px 0;gap:8px;">
-      <span class="grow"><span class="avatar" style="width:26px;height:26px;font-size:11px;display:inline-flex;vertical-align:middle;background:${avatarColor(u)}">${escapeHtml(initials(u))}</span> ${escapeHtml(u)} <span class="muted small">🪙${fmtNum(balance(u))}</span></span>
-      <select class="select" style="width:150px" data-act="user-store" data-id="${escapeHtml(u)}">
-        <option value="">未設定</option>
-        ${storeList().map(s=>`<option value="${s.id}" ${userStoreId(u)===s.id?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
-      </select>
-    </div>`).join('') : `<div class="empty">メンバーがいません</div>`}
+    ${users.length? users.map(u=>{ const m=DB.users[u]||{};
+      return `<div style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+      <div class="row" style="gap:8px;">
+        <span class="avatar" style="width:30px;height:30px;font-size:12px;background:${avatarColor(u)}">${escapeHtml(initials(u))}</span>
+        <div class="grow"><div style="font-weight:700;">${escapeHtml(u)} ${m.role==='admin'?'<span class="tag">管理者</span>':''}</div>
+          <div class="muted small">ID: ${escapeHtml(m.loginId||'—')} ・ 🪙${fmtCoin(balance(u))}</div></div>
+        <button class="btn btn-ghost btn-sm" data-act="reset-pass" data-id="${escapeHtml(u)}">パス再設定</button>
+        <button class="btn btn-ghost btn-sm" data-act="del-user" data-id="${escapeHtml(u)}">削除</button>
+      </div>
+      <div class="row" style="gap:8px;margin-top:6px;">
+        <select class="select" style="flex:1" data-act="user-store" data-id="${escapeHtml(u)}">
+          <option value="">店舗未設定</option>
+          ${storeList().map(s=>`<option value="${s.id}" ${userStoreId(u)===s.id?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+        </select>
+        <select class="select" style="width:120px" data-act="user-role" data-id="${escapeHtml(u)}">
+          <option value="member" ${m.role!=='admin'?'selected':''}>メンバー</option>
+          <option value="admin" ${m.role==='admin'?'selected':''}>管理者</option>
+        </select>
+      </div>
+    </div>`; }).join('') : `<div class="empty">メンバーがいません</div>`}
+    <div class="divider"></div>
+    <h3>メンバーを追加</h3>
+    <div class="stack">
+      <div class="row" style="gap:6px;">
+        <input class="input grow" id="nm-name" placeholder="お名前（例：鈴木 一郎）">
+        <select class="select" style="width:130px" id="nm-store">
+          <option value="">店舗</option>
+          ${storeList().map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="row" style="gap:6px;">
+        <input class="input grow" id="nm-id" placeholder="ログインID（例：suzuki）" autocomplete="off">
+        <input class="input" style="width:130px" id="nm-pass" placeholder="パスワード">
+        <select class="select" style="width:110px" id="nm-role">
+          <option value="member">メンバー</option>
+          <option value="admin">管理者</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-secondary btn-sm" style="margin-top:8px;" data-act="add-user">＋ メンバー追加</button>
+    <p class="muted small" style="margin-top:8px;">ログインは「ログインID＋パスワード」。IDは重複できません。</p>
   </div>`;
 }
 function consoleSystem(){
@@ -888,22 +923,22 @@ function showGacha(base, streakBonus, onClose){
   </div></div>`;
   setTimeout(()=>{
     const tier=pickGacha();
-    const total=base+streakBonus+tier.bonus;
+    const total=round1(base+streakBonus+tier.bonus);
     const el=document.getElementById('gacha');
     if(!el) return;
     el.classList.add('done');
     el.innerHTML=`
-      <div class="coin3d">${tier.key==='jackpot'?'💎':'🪙'}</div>
-      <div class="tier" style="background:${tier.color}22;color:${tier.color}">${escapeHtml(tier.label)}</div>
-      <div class="result-amt">+${fmtNum(total)}<small>🪙</small></div>
+      <div class="coin3d">${tier.key==='g20'?'💎':'🪙'}</div>
+      <div class="tier" style="background:${tier.color}22;color:${tier.color}">🎰 ${escapeHtml(tier.label)}</div>
+      <div class="result-amt">+${fmtCoin(total)}<small>🪙</small></div>
       <div class="breakdown">
-        <div class="ln"><span>投稿ボーナス</span><span>+${base}🪙</span></div>
-        ${streakBonus>0?`<div class="ln"><span>🔥 連続学習ボーナス</span><span>+${streakBonus}🪙</span></div>`:''}
-        <div class="ln"><span>🎰 ガチャ（${escapeHtml(tier.label)}）</span><span>+${tier.bonus}🪙</span></div>
-        <div class="ln tot"><span>合計獲得</span><span>+${fmtNum(total)}🪙</span></div>
+        <div class="ln"><span>投稿ボーナス</span><span>+${fmtCoin(base)}🪙</span></div>
+        ${streakBonus>0?`<div class="ln"><span>🔥 連続学習ボーナス</span><span>+${fmtCoin(streakBonus)}🪙</span></div>`:''}
+        <div class="ln"><span>🎰 ガチャ（${escapeHtml(tier.label)}）</span><span>+${fmtCoin(tier.bonus)}🪙</span></div>
+        <div class="ln tot"><span>合計獲得</span><span>+${fmtCoin(total)}🪙</span></div>
       </div>
       <button class="btn btn-primary btn-block btn-lg" style="margin-top:16px;" data-act="gacha-close">受け取る 🎉</button>`;
-    if(tier.bonus>=100) fireConfetti();
+    if(tier.bonus>=1.5) fireConfetti();
     onClose(tier, total);
     // モーダルはrender()の外で生成されるため、ボタンに直接ハンドラを付与
     const closeBtn=el.querySelector('[data-act="gacha-close"]');
@@ -946,7 +981,7 @@ function doSubmitPost(){
 
   showGacha(r.base, streakBonus, (tier, total)=>{
     post.coinsAwarded=total;
-    addLedger(user, total, 'post', `学び投稿（${courseTitle}）${tier.key!=='normal'?'・'+tier.label:''}`);
+    addLedger(user, total, 'post', `学び投稿（${courseTitle}）・ガチャ${tier.label}`);
     saveDB(); Remote.pushPost(post);
   });
   postDraftCourse='';
@@ -1036,28 +1071,25 @@ function bind(){
   // ナビ
   document.querySelectorAll('[data-go]').forEach(el=> el.onclick=()=>go(el.getAttribute('data-go')) );
 
-  // ログイン
-  const ln=document.querySelector('[data-act="login-new"]');
-  if(ln) ln.onclick=()=>{
-    const name=(document.getElementById('login-name').value||'').trim();
-    const store=(document.getElementById('login-store')||{}).value||'';
-    if(!name){ toast('お名前を入力してください','error'); return; }
-    if(!DB.users[name]) DB.users[name]={ store, storeName:storeName(store), joinedAt:new Date().toISOString() };
-    else if(store){ DB.users[name].store=store; DB.users[name].storeName=storeName(store); }
-    DB.currentUser=name; saveDB(); Remote.pushUser(name); VIEW='home'; render();
+  // ログイン（ID＋パスワード）
+  const ln=document.querySelector('[data-act="login-idpass"]');
+  const doLogin=()=>{
+    const id=(document.getElementById('login-id').value||'').trim();
+    const pass=(document.getElementById('login-pass').value||'');
+    if(!id||!pass){ toast('IDとパスワードを入力してください','error'); return; }
+    const name=Object.keys(DB.users).find(n=>((DB.users[n].loginId||'').toLowerCase())===id.toLowerCase());
+    if(!name || String(DB.users[name].password||'')!==pass){ toast('IDまたはパスワードが違います','error'); return; }
+    DB.currentUser=name; saveDB(); VIEW='home'; render();
     toast(`ようこそ、${name}さん！`,'success');
   };
-  const le=document.querySelector('[data-act="login-existing"]');
-  if(le) le.onclick=()=>{
-    const v=document.getElementById('login-existing').value;
-    if(!v){ toast('名前を選択してください','error'); return; }
-    DB.currentUser=v; saveDB(); VIEW='home'; render();
-  };
+  if(ln) ln.onclick=doLogin;
+  const passEl=document.getElementById('login-pass');
+  if(passEl) passEl.onkeydown=(e)=>{ if(e.key==='Enter') doLogin(); };
 
   // generic data-act（select/input は change、それ以外は click）
   document.querySelectorAll('[data-act]').forEach(el=>{
     const act=el.getAttribute('data-act');
-    if(['login-new','login-existing'].includes(act)) return;
+    if(['login-idpass'].includes(act)) return;
     const tag=el.tagName;
     if(tag==='SELECT' || tag==='INPUT' || tag==='TEXTAREA'){ el.onchange=(ev)=>handleAct(act, el, ev); }
     else { el.onclick=(ev)=>handleAct(act, el, ev); }
@@ -1105,6 +1137,10 @@ function handleAct(act, el, ev){
     case 'del-store': delStore(id); break;
     case 'rename-store': renameStore(id, el.value); break;
     case 'user-store': { const u=id; if(DB.users[u]){ DB.users[u].store=el.value; DB.users[u].storeName=storeName(el.value); saveDB(); Remote.pushUser(u); render(); } break; }
+    case 'user-role': { const u=id; if(DB.users[u]){ DB.users[u].role=el.value; saveDB(); Remote.pushUser(u); render(); } break; }
+    case 'add-user': addMember(); break;
+    case 'del-user': delMember(id); break;
+    case 'reset-pass': resetPass(id); break;
     case 'red-status': { const rd=DB.redemptions.find(r=>r.id===id); if(rd){ rd.status=el.getAttribute('data-s'); saveDB(); Remote.pushRedemption(rd); render(); } break; }
     case 'refresh': doRefresh(); break;
   }
@@ -1120,7 +1156,7 @@ function doRefresh(){
 }
 
 function saveRules(){
-  const num=(k)=>{ const el=document.getElementById('cfg-'+k); if(!el) return undefined; const s=el.value.trim(); if(s==='') return ''; const n=parseInt(s,10); return isNaN(n)?undefined:n; };
+  const num=(k)=>{ const el=document.getElementById('cfg-'+k); if(!el) return undefined; const s=el.value.trim(); if(s==='') return ''; const n=round1(parseFloat(s)); return isNaN(n)?undefined:n; };
   if(!cfgStore){
     // 全社デフォルト
     OVERRIDABLE_RULE_KEYS.forEach(k=>{ const n=num(k); if(typeof n==='number') DB.config.rules[k]=n; });
@@ -1149,6 +1185,32 @@ function savePasscode(){
 function saveAdminEmail(){
   const v=(document.getElementById('sys-email').value||'').trim();
   DB.config.admin.email=v; saveDB(); Remote.pushConfig(); toast(v?'通知先メールを保存しました':'通知先メールを空にしました','success');
+}
+function addMember(){
+  const name=(document.getElementById('nm-name').value||'').trim();
+  const loginId=(document.getElementById('nm-id').value||'').trim();
+  const password=(document.getElementById('nm-pass').value||'').trim();
+  const store=(document.getElementById('nm-store')||{}).value||'';
+  const role=(document.getElementById('nm-role')||{}).value||'member';
+  if(!name){ toast('お名前を入力してください','error'); return; }
+  if(!loginId){ toast('ログインIDを入力してください','error'); return; }
+  if(!password){ toast('パスワードを入力してください','error'); return; }
+  if(DB.users[name]){ toast('その名前は既に登録済みです','error'); return; }
+  if(Object.keys(DB.users).some(n=>(DB.users[n].loginId||'').toLowerCase()===loginId.toLowerCase())){ toast('そのログインIDは既に使われています','error'); return; }
+  DB.users[name]={ name, loginId, password, store, storeName:storeName(store), role, joinedAt:new Date().toISOString() };
+  saveDB(); Remote.pushUser(name); render(); toast(`${name}さんを追加しました`,'success');
+}
+function delMember(name){
+  if(!confirm(`「${name}」を削除しますか？（投稿・コイン履歴は残ります）`)) return;
+  delete DB.users[name];
+  if(DB.currentUser===name) DB.currentUser=null;
+  saveDB(); render(); toast('メンバーを削除しました','success');
+}
+function resetPass(name){
+  const p=prompt(`「${name}」の新しいパスワードを入力`,'');
+  if(p===null) return;
+  const np=String(p).trim(); if(!np){ toast('パスワードが空です','error'); return; }
+  DB.users[name].password=np; saveDB(); Remote.pushUser(name); toast('パスワードを再設定しました','success');
 }
 function addStore(){
   const name=(document.getElementById('ns-name').value||'').trim();
