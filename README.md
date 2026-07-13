@@ -46,8 +46,28 @@ Supabase をやめ、reportlink と同じ **Postgres(Vercel/Neon) + Prisma** 構
   - ログインはサーバー側で検証（既存の平文パスワードは初回ログイン時に scrypt へ自動移行）。
   - リアルタイム同期は廃止（`channel` は no-op）。データ更新は topbar の「更新」ボタンで手動。
   - ローカル Postgres を立てて **ログイン→ダッシュボード描画→保存→別セッションで再取得** まで検証済み。
-- **Phase 3（予定）… 移行仕上げ**
-  - 既存 Supabase データの移行手順／スクリプト、権限（役割別）認可の厳格化、Next.js のパッチ更新。
+- **Phase 3（進行中）… 移行仕上げ**
+  - 既存 Supabase データの移行スクリプト（`scripts/migrate-from-supabase.js`）を用意。
+  - 役割別認可の厳格化、Next.js のパッチ更新（順次）。
+
+### 既存 Supabase データの移行
+
+Supabase も中身は Postgres なので、両 DB を直結してテーブル単位でコピーする。
+
+```bash
+# 移行先スキーマを先に用意
+npx prisma migrate deploy
+
+# 移行元(Supabase 直接接続) → 移行先(DATABASE_URL) へコピー（非破壊：新規行のみ）
+SOURCE_DB_URL="postgresql://postgres:PW@db.<ref>.supabase.co:5432/postgres" \
+DATABASE_URL="postgresql://...neon..." \
+node scripts/migrate-from-supabase.js
+#   既存行も上書きしたい場合は末尾に --overwrite
+```
+
+- 移行先テーブルに存在する列だけをコピーするためスキーマ差異に強い。
+- 冪等（再実行しても重複しない）。`app_users.password` は平文でも移り、
+  初回ログイン時にサーバー側で scrypt へ自動移行される。
 
 ### 初回セットアップ（Phase 2 完了後の実行手順）
 
