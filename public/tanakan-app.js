@@ -1417,11 +1417,70 @@ async function releaseApprovalDeadline() {
 
 function setSaveStatus(state) {
   const el = document.getElementById('save-status');
-  if (!el) return;
-  if (state === 'saving') { el.textContent = '保存中…'; el.className = 'save-status saving'; }
-  else if (state === 'error') { el.textContent = '⚠ 保存失敗'; el.className = 'save-status error'; }
-  else { el.textContent = '✓ 保存しました'; el.className = 'save-status saved'; }
+  if (state === 'saving') { if (el) { el.textContent = '保存中…'; el.className = 'save-status saving'; } }
+  else if (state === 'error') {
+    _saveHealthy = false; _lastSaveErrMsg = _lastDbError || '';
+    if (el) { el.textContent = '⚠ 保存失敗'; el.className = 'save-status error'; }
+    refreshConnBanner();
+  } else {
+    if (!_saveHealthy) { _saveHealthy = true; _lastSaveErrMsg = ''; refreshConnBanner(); }
+    if (el) { el.textContent = '✓ 保存しました'; el.className = 'save-status saved'; }
+  }
 }
+
+// =========================================================
+// 接続・保存ヘルスチェック
+//   sb（Supabase接続）の有無と直近の保存結果を常設バナーで可視化し、
+//   「入力したのに保存されない」状態をサイレントにしない。
+// =========================================================
+let _saveHealthy = true;
+let _lastSaveErrMsg = '';
+function connBannerHtml() {
+  if (State.view === 'login') return '';
+  if (!sb) {
+    return '<div class="conn-banner offline">⚠ サーバーに接続できていません。入力しても保存されません（接続先URL/KEYや通信状況をご確認ください）。'
+      + '<button class="conn-diag-btn" data-action="save-diag">接続診断</button></div>';
+  }
+  if (!_saveHealthy) {
+    return '<div class="conn-banner warn">⚠ 直近の保存に失敗しました'
+      + (_lastSaveErrMsg ? '（' + escapeHtml(_lastSaveErrMsg) + '）' : '')
+      + '。通信状況やアクセス権（RLS）をご確認ください。'
+      + '<button class="conn-diag-btn" data-action="save-diag">再診断</button></div>';
+  }
+  return '';
+}
+function refreshConnBanner() {
+  const host = document.getElementById('conn-banner-host');
+  if (host) host.innerHTML = connBannerHtml();
+}
+// 読み取り→書き込み→後始末 を app_config で試し、保存可否を実測する（非破壊）
+async function runSaveDiagnostics() {
+  const res = { sb: !!sb, canRead: false, canWrite: false, error: '' };
+  if (!sb) { res.error = 'Supabaseクライアント未初期化（CDN未読込、またはURL/KEY未設定）'; return res; }
+  try {
+    const rd = await sb.from('app_config').select('key').limit(1);
+    if (rd.error) { res.error = '読み取り失敗: ' + (rd.error.message || rd.error.code || JSON.stringify(rd.error)); return res; }
+    res.canRead = true;
+    const key = '__health_check';
+    const wr = await sb.from('app_config').upsert([{ key, value: new Date().toISOString() }], { onConflict: 'key' });
+    if (wr.error) { res.error = '書き込み失敗: ' + (wr.error.message || wr.error.code || JSON.stringify(wr.error)); return res; }
+    res.canWrite = true;
+    await sb.from('app_config').delete().eq('key', key); // テスト行を後始末
+  } catch (e) { res.error = String((e && e.message) || e); }
+  return res;
+}
+window.saveDiagnostics = async function () {
+  toast('接続を診断中…');
+  const r = await runSaveDiagnostics();
+  if (r.canRead && r.canWrite) {
+    _saveHealthy = true; _lastSaveErrMsg = '';
+    toast('✓ 接続OK：読み取り・保存ともに正常です', 'success');
+  } else {
+    _saveHealthy = false; _lastSaveErrMsg = r.error;
+    toast('⚠ 保存できません：' + (r.error || '不明なエラー'), 'error');
+  }
+  refreshConnBanner();
+};
 
 function deadlineBanner() {
   let out = '';
@@ -1580,6 +1639,15 @@ function render() {
     default:          html = renderLogin();
   }
   root.innerHTML = html;
+  // 接続バナー（ログイン画面以外・topbarの直下に表示）
+  if (State.view !== 'login') {
+    const header = root.querySelector('.topbar');
+    const host = document.createElement('div');
+    host.id = 'conn-banner-host';
+    host.innerHTML = connBannerHtml();
+    if (header && header.parentNode) header.parentNode.insertBefore(host, header.nextSibling);
+    else root.insertBefore(host, root.firstChild);
+  }
   attachHandlers();
   if (State.view === 'login') { try { initLoginFx(); } catch(e){} }
   // 入力者名フィールドの値を復元
@@ -1620,6 +1688,7 @@ function renderTopbar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>` : ''}
     ${State.user?.isSuperAdmin ? `<button class="icon-btn" data-action="goto-console" title="KOESAコンソール（super_admin専用）" style="color:#0e7490;font-size:18px;">⚙️</button>` : ''}
+    ${canAccessAdmin() ? `<button class="icon-btn" data-action="save-diag" title="接続・保存の診断">🔌</button>` : ''}
     <button class="icon-btn" data-action="refresh-data" title="最新データに更新（ログアウトしません）">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
     </button>
@@ -5360,6 +5429,7 @@ async function handleAction(e) {
       break;
     }
     case 'logout': doLogout(); break;
+    case 'save-diag': await saveDiagnostics(); break;
     case 'refresh-data': await refreshData(); break;
     case 'save-deadline': await saveDeadline(); break;
     case 'clear-deadline': await clearDeadline(); break;
