@@ -1028,19 +1028,8 @@ async function init() {
     return;
   }
 
-  // ユーザーリストを先読み（Supabaseから、無ければデフォルト投入）
-  try {
-    const users = await storage.get('users');
-    if (users && users.length > 0) {
-      State.users = users;
-    } else {
-      State.users = DEFAULT_USERS_LIST;
-      await storage.set('users', DEFAULT_USERS_LIST);
-    }
-  } catch (e) {
-    console.error('users preload error', e);
-    State.users = DEFAULT_USERS_LIST;
-  }
+  // 認証はサーバー側（/api/auth/login）で行うため、ログイン前にユーザー一覧は
+  // 取得しない。実ユーザーはログイン後に loadAll() が読み込む。
 
   // 設定(ブランディング/機能/権限)を先読み ※ログイン前に必要・失敗しても続行
   try {

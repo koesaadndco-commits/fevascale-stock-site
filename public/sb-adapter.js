@@ -51,13 +51,18 @@
     };
   }
 
-  QueryBuilder.prototype.select = function (cols) {
+  QueryBuilder.prototype.select = function (cols, opts) {
     if (this.spec.action === 'select') {
       this.spec.select = cols || '*';
     } else {
       // 変更系の後の .select() は「変更結果を返す」指定
       this.spec.returning = true;
       this.spec.select = cols || '*';
+    }
+    // 件数取得: .select('id', { count: 'exact', head: true })
+    if (opts && opts.count) {
+      this.spec.count = opts.count;
+      this.spec.head = !!opts.head;
     }
     return this;
   };
