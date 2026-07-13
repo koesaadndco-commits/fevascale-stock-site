@@ -1401,6 +1401,14 @@
   .seal-stamp-btn:hover { border-color:#10b981; color:#0f766e; }
   .seal-undo { background:none; border:none; color:#94a3b8; font-size:11px; cursor:pointer; text-decoration:underline; }
   .seal-empty-note { font-size:12px; color:#94a3b8; }
+  .seal-seal { width:72px; height:72px; display:flex; align-items:center; justify-content:center; }
+  .seal-seal.ghost { opacity:.18; }
+  .seal-name-input { width:120px; border:1px solid #cbd5e1; border-radius:8px; padding:5px 8px; font-size:13px;
+    text-align:center; color:#1e293b; }
+  .seal-name-input:focus { outline:none; border-color:#10b981; }
+  .seal-stamp-btn2 { background:#c0341d; border:none; border-radius:10px; cursor:pointer; color:#fff;
+    padding:7px 12px; font-size:12px; font-weight:700; }
+  .seal-stamp-btn2:hover { background:#a12a16; }
   .seal-assign { margin-top:8px; font-size:12px; color:#475569; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .seal-assign select { border:1px solid #cbd5e1; border-radius:6px; padding:4px 6px; font-size:12px; }
   /* === Phase F: 店舗間 売買伝票 === */

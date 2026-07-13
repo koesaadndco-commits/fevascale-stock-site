@@ -2088,8 +2088,6 @@ function renderFoodLoss(){
 }
 
 
-const SEAL_PRESIDENT_IMG='/assets/seal-president.png';
-const SEAL_DIRECTOR_IMG='/assets/seal-director.png';
 
 // =========================================================
 // 食材ロス: Excel一括取込 / ロス実績ランキング / デジタル押印
@@ -2212,10 +2210,18 @@ function canStamp(role){
   if(role==='director'){ if(a.dirUid) return u.id===a.dirUid; return u.role==='director'||u.role==='soumu'||u.role==='admin'||u.role==='super_admin'; }
   return false;
 }
+window.sealPreview = function(role){
+  const inp=document.getElementById('seal-name-'+role);
+  const pv=document.getElementById('seal-preview-'+role);
+  if(inp && pv) pv.innerHTML = sealHtml(inp.value.trim(), 72);
+};
 window.stampSeal = async function(role){
   if(!canStamp(role)){ toast('この枠を押印する権限がありません','error'); return; }
   const period=State.month;
-  const name = role==='president' ? (State.sealAssign.presName||'濱端') : (State.sealAssign.dirName||'今川');
+  const assigned = role==='president' ? (State.sealAssign.presName||'濱端') : (State.sealAssign.dirName||'今川');
+  const inp=document.getElementById('seal-name-'+role);
+  const name = (inp && inp.value.trim()) ? inp.value.trim() : assigned;
+  if(!name){ toast('氏名を入力してください','error'); return; }
   const rec={ id:period+'_'+role, period, role, name, stamped_by:State.user?.name||'', stamped_at:new Date().toISOString() };
   const { error } = await sb.from('seal_stamps').upsert([rec],{ onConflict:'id' });
   if(error){ toast('押印に失敗: '+(error.message||''),'error'); return; }
@@ -2260,19 +2266,23 @@ function renderSealSection(){
   const s=State.sealStamps||{};
   const cell=(role)=>{
     const rec=s[role];
-    const img=role==='president'?SEAL_PRESIDENT_IMG:SEAL_DIRECTOR_IMG;
     const label=role==='president'?'社長':'常務';
     const name=role==='president'?(State.sealAssign.presName||'濱端'):(State.sealAssign.dirName||'今川');
     if(rec){
       return '<div class="seal-box stamped"><div class="seal-role">'+label+'</div>'+
-        '<img class="seal-img" src="'+img+'" alt="'+label+'印">'+
+        '<div class="seal-seal">'+sealHtml(rec.name||name, 72)+'</div>'+
         '<div class="seal-meta">'+escapeHtml(rec.name||name)+'　'+fmtStampDate(rec.stamped_at)+'</div>'+
         (canStamp(role)?'<button class="seal-undo" onclick="unstampSeal(\''+role+'\')">取消</button>':'')+'</div>';
     }
+    if(canStamp(role)){
+      return '<div class="seal-box empty"><div class="seal-role">'+label+'</div>'+
+        '<div id="seal-preview-'+role+'" class="seal-seal">'+sealHtml(name, 72)+'</div>'+
+        '<input id="seal-name-'+role+'" class="seal-name-input" type="text" value="'+escapeHtml(name)+'" placeholder="氏名を入力" oninput="sealPreview(\''+role+'\')">'+
+        '<button class="seal-stamp-btn2" onclick="stampSeal(\''+role+'\')">この認印で押印</button></div>';
+    }
     return '<div class="seal-box empty"><div class="seal-role">'+label+'</div>'+
-      (canStamp(role)
-        ? '<button class="seal-stamp-btn" onclick="stampSeal(\''+role+'\')"><img class="seal-img ghost" src="'+img+'" alt=""><span>タッチして押印</span></button>'
-        : '<div class="seal-empty-note">'+escapeHtml(name)+'（未押印）</div>')+'</div>';
+      '<div class="seal-seal ghost">'+sealHtml(name, 72)+'</div>'+
+      '<div class="seal-empty-note">'+escapeHtml(name)+'（未押印）</div></div>';
   };
   const isAdmin=(State.user?.role==='admin'||State.user?.role==='super_admin');
   const sealEligible = isAdmin || canStamp('president') || canStamp('director');
@@ -3118,8 +3128,8 @@ function slipPrintBox(s) {
     <table class="slip-print-table"><tbody>${lineRows}<tr class="tot"><td>合計</td><td class="num">${formatYen(total)}</td></tr></tbody></table>
     ${s.buyerReason ? `<div class="slip-print-reason">購入理由: ${escapeHtml(s.buyerReason)}</div>` : ''}
     <div class="slip-print-sigs">
-      <div class="sig"><div class="lbl">販売 ${escapeHtml(s.sellerName || '')}</div>${(s.sellerSig && String(s.sellerSig).startsWith('data:')) ? `<img src="${s.sellerSig}">` : (s.sellerName ? sealHtml(s.sellerName, 64) : '<div class="noimg"></div>')}</div>
-      <div class="sig"><div class="lbl">購入 ${escapeHtml(s.buyerName || '')}</div>${(s.buyerSig && String(s.buyerSig).startsWith('data:')) ? `<img src="${s.buyerSig}">` : (s.buyerName ? sealHtml(s.buyerName, 64) : '<div class="noimg"></div>')}</div>
+      <div class="sig"><div class="lbl">販売 ${escapeHtml(s.sellerName || '')}</div>${s.sellerName ? sealHtml(s.sellerName, 64) : '<div class="noimg"></div>'}</div>
+      <div class="sig"><div class="lbl">購入 ${escapeHtml(s.buyerName || '')}</div>${s.buyerName ? sealHtml(s.buyerName, 64) : '<div class="noimg"></div>'}</div>
     </div>
     <div class="slip-print-hq">${s.hqBy ? `本社承認: ${escapeHtml(s.hqBy)}　${s.hqAt ? new Date(s.hqAt).toLocaleDateString('ja-JP') : ''}` : '本社未承認'}</div>
   </div>`;
@@ -3340,84 +3350,6 @@ function renderApprovalSection() {
       <div class="approve-status-list">${rows}</div>
       ${renderSealSection()}
     </div>`;
-}
-
-// Initialize signature pads after render
-function initSignaturePads() {
-  for (const brand of allBrands()) {
-    const canvas = document.getElementById(`sign-pad-${brand}`);
-    if (canvas) setupSignaturePad(canvas);
-  }
-  for (const s of State.stores) {
-    const c = document.getElementById(`sign-pad-store-${s.id}`);
-    if (c) setupSignaturePad(c);
-  }
-}
-
-function setupSignaturePad(canvas) {
-  // Adjust canvas resolution to match displayed size
-  const rect = canvas.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = rect.width * dpr;
-  canvas.height = 120 * dpr;
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  ctx.strokeStyle = '#1c1917';
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  canvas._hasSig = false;
-
-  let drawing = false;
-  let lastX = 0, lastY = 0;
-
-  function getPos(e) {
-    const r = canvas.getBoundingClientRect();
-    if (e.touches && e.touches.length) {
-      return { x: e.touches[0].clientX - r.left, y: e.touches[0].clientY - r.top };
-    }
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  }
-  function start(e) {
-    e.preventDefault();
-    const p = getPos(e);
-    drawing = true; lastX = p.x; lastY = p.y;
-  }
-  function move(e) {
-    if (!drawing) return;
-    e.preventDefault();
-    const p = getPos(e);
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-    lastX = p.x; lastY = p.y;
-    canvas._hasSig = true;
-  }
-  function end() { drawing = false; }
-  canvas.addEventListener('mousedown', start);
-  canvas.addEventListener('mousemove', move);
-  canvas.addEventListener('mouseup', end);
-  canvas.addEventListener('mouseleave', end);
-  canvas.addEventListener('touchstart', start);
-  canvas.addEventListener('touchmove', move);
-  canvas.addEventListener('touchend', end);
-}
-
-function clearSignaturePad(brand) {
-  // 対象ブランドのパッドのみクリア（未指定時は全ブランド）
-  const brands = brand ? [brand] : allBrands();
-  for (const b of brands) {
-    const canvas = document.getElementById(`sign-pad-${b}`);
-    if (!canvas) continue;
-    const ctx = canvas.getContext('2d');
-    // DPRスケールを一旦解除して実ピクセル全域を消去
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
-    canvas._hasSig = false;
-  }
 }
 
 async function submitApproval(brand) {
@@ -3716,7 +3648,7 @@ window.printInventoryRanking = function(){
 };
 
 // =========================================================
-// Phase C-2: 店舗ごと確認・手書き署名
+// Phase C-2: 店舗ごと確認・認印（氏名から自動生成）
 // =========================================================
 function storeConfirmEligibility(storeId) {
   const inv = State.inventory[storeId] || {};
@@ -3787,13 +3719,6 @@ async function submitStoreSignature(storeId) {
   } finally { _pendingSave = false; markLocalWrite(); render(); }
 }
 
-function clearStoreSignPad(storeId) {
-  const canvas = document.getElementById(`sign-pad-store-${storeId}`);
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  canvas._hasSig = false;
-}
 
 function renderStoreConfirmBlock(store) {
   const inv = State.inventory[store.id] || {};
@@ -5542,12 +5467,10 @@ async function handleAction(e) {
     case 'toggle-note': toggleNote(el.dataset.itemId); break;
     case 'open-approval': navigate('approval', { brand: el.dataset.brand }); break;
     case 'approve-confirm': await submitApproval(el.dataset.brand); break;
-    case 'approval-clear-sig': clearSignaturePad(el.dataset.brand); break;
     case 'approval-revoke': await revokeApproval(el.dataset.brand); break;
     case 'print-store': printStore(el.dataset.storeId); break;
     case 'print-alerts': printAlerts(); break;
     case 'sign-store': await submitStoreSignature(el.dataset.storeId); break;
-    case 'clear-store-sig': clearStoreSignPad(el.dataset.storeId); break;
     case 'export-store-xlsx': await exportStoreXlsx(el.dataset.storeId); break;
     case 'export-all-xlsx': await exportAllStoresXlsx(el.dataset.brand); break;
     case 'download-items-template': await exportItemsTemplateXlsx(el.dataset.brand); break;
