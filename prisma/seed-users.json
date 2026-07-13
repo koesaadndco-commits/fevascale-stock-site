@@ -1,0 +1,317 @@
+[
+  {
+    "id": "admin",
+    "password": "admin",
+    "role": "admin",
+    "name": "管理者",
+    "position": "管理者",
+    "defaultStore": null,
+    "approveBrand": null
+  },
+  {
+    "id": "mgr-h",
+    "password": "pass",
+    "role": "manager",
+    "name": "8番統括 鈴木",
+    "position": "業態責任者",
+    "defaultStore": null,
+    "approveBrand": "hachiban"
+  },
+  {
+    "id": "mgr-k",
+    "password": "pass",
+    "role": "manager",
+    "name": "コメダ統括 高橋",
+    "position": "業態責任者",
+    "defaultStore": null,
+    "approveBrand": "komeda"
+  },
+  {
+    "id": "mgr-p",
+    "password": "pass",
+    "role": "manager",
+    "name": "ヒョンチャン統括",
+    "position": "業態責任者",
+    "defaultStore": null,
+    "approveBrand": "hyonchan"
+  },
+  {
+    "id": "soumu",
+    "password": "pass",
+    "role": "soumu",
+    "name": "総務部 中村",
+    "position": "総務",
+    "defaultStore": null,
+    "approveBrand": null
+  },
+  {
+    "id": "u001",
+    "password": "pass",
+    "role": "staff",
+    "name": "前田 昭仁",
+    "position": "社員",
+    "defaultStore": "h-kunidaka",
+    "approveBrand": null
+  },
+  {
+    "id": "u002",
+    "password": "pass",
+    "role": "staff",
+    "name": "中野 和美",
+    "position": "店長",
+    "defaultStore": "h-kunidaka",
+    "approveBrand": null
+  },
+  {
+    "id": "u003",
+    "password": "pass",
+    "role": "staff",
+    "name": "井上 実代子",
+    "position": "社員",
+    "defaultStore": "h-sabae",
+    "approveBrand": null
+  },
+  {
+    "id": "u004",
+    "password": "pass",
+    "role": "staff",
+    "name": "橋本 武志",
+    "position": "店長",
+    "defaultStore": "h-sabae",
+    "approveBrand": null
+  },
+  {
+    "id": "u005",
+    "password": "pass",
+    "role": "staff",
+    "name": "竹内 美加",
+    "position": "副店長",
+    "defaultStore": "h-sabae",
+    "approveBrand": null
+  },
+  {
+    "id": "u006",
+    "password": "pass",
+    "role": "staff",
+    "name": "髙島 孝仁",
+    "position": "社員",
+    "defaultStore": "h-sabae",
+    "approveBrand": null
+  },
+  {
+    "id": "u007",
+    "password": "pass",
+    "role": "staff",
+    "name": "渡辺 有加里",
+    "position": "社員",
+    "defaultStore": "h-sabae-east",
+    "approveBrand": null
+  },
+  {
+    "id": "u008",
+    "password": "pass",
+    "role": "staff",
+    "name": "野嶋 郁甫",
+    "position": "係長",
+    "defaultStore": "h-sabae-east",
+    "approveBrand": null
+  },
+  {
+    "id": "u009",
+    "password": "pass",
+    "role": "staff",
+    "name": "谷口 康裕",
+    "position": "社員",
+    "defaultStore": "h-sabae-east",
+    "approveBrand": null
+  },
+  {
+    "id": "u010",
+    "password": "pass",
+    "role": "staff",
+    "name": "齋藤 貴文",
+    "position": "店長",
+    "defaultStore": "h-sabae-east",
+    "approveBrand": null
+  },
+  {
+    "id": "u011",
+    "password": "pass",
+    "role": "staff",
+    "name": "高橋 孝予",
+    "position": "店長",
+    "defaultStore": "h-shinmei",
+    "approveBrand": null
+  },
+  {
+    "id": "u012",
+    "password": "pass",
+    "role": "staff",
+    "name": "細井 大貴",
+    "position": "社員",
+    "defaultStore": "h-shinmei",
+    "approveBrand": null
+  },
+  {
+    "id": "u013",
+    "password": "pass",
+    "role": "staff",
+    "name": "増永 聖音",
+    "position": "社員",
+    "defaultStore": "h-shinmei",
+    "approveBrand": null
+  },
+  {
+    "id": "u014",
+    "password": "pass",
+    "role": "staff",
+    "name": "冨坂 莉那",
+    "position": "社員",
+    "defaultStore": "h-shinmei",
+    "approveBrand": null
+  },
+  {
+    "id": "u015",
+    "password": "pass",
+    "role": "staff",
+    "name": "見附 大輔",
+    "position": "店長",
+    "defaultStore": "h-takefu",
+    "approveBrand": null
+  },
+  {
+    "id": "u016",
+    "password": "pass",
+    "role": "staff",
+    "name": "櫻井 路子",
+    "position": "係長",
+    "defaultStore": "h-takefu",
+    "approveBrand": null
+  },
+  {
+    "id": "u017",
+    "password": "pass",
+    "role": "staff",
+    "name": "神戸 剛",
+    "position": "係長",
+    "defaultStore": "h-takefu",
+    "approveBrand": null
+  },
+  {
+    "id": "u018",
+    "password": "pass",
+    "role": "staff",
+    "name": "山田 直樹",
+    "position": "社員",
+    "defaultStore": "k-otsu-ouji",
+    "approveBrand": null
+  },
+  {
+    "id": "u019",
+    "password": "pass",
+    "role": "staff",
+    "name": "橋野 恵",
+    "position": "アシスト社員",
+    "defaultStore": "k-otsu-ouji",
+    "approveBrand": null
+  },
+  {
+    "id": "u020",
+    "password": "pass",
+    "role": "staff",
+    "name": "筈井 友香里",
+    "position": "アシスト社員",
+    "defaultStore": "k-otsu-ouji",
+    "approveBrand": null
+  },
+  {
+    "id": "u021",
+    "password": "pass",
+    "role": "staff",
+    "name": "山本 遥",
+    "position": "社員",
+    "defaultStore": "k-otsu-katata",
+    "approveBrand": null
+  },
+  {
+    "id": "u022",
+    "password": "pass",
+    "role": "staff",
+    "name": "竹内 沙羅",
+    "position": "店長",
+    "defaultStore": "k-otsu-katata",
+    "approveBrand": null
+  },
+  {
+    "id": "u023",
+    "password": "pass",
+    "role": "staff",
+    "name": "城野 茜",
+    "position": "サービストレーナー",
+    "defaultStore": "k-sabae",
+    "approveBrand": null
+  },
+  {
+    "id": "u024",
+    "password": "pass",
+    "role": "staff",
+    "name": "大町 里奈",
+    "position": "社員",
+    "defaultStore": "k-setagawa",
+    "approveBrand": null
+  },
+  {
+    "id": "u025",
+    "password": "pass",
+    "role": "staff",
+    "name": "内田 遥都",
+    "position": "社員",
+    "defaultStore": "k-setagawa",
+    "approveBrand": null
+  },
+  {
+    "id": "u026",
+    "password": "pass",
+    "role": "staff",
+    "name": "大丁 聖也",
+    "position": "社員",
+    "defaultStore": "k-takefu",
+    "approveBrand": null
+  },
+  {
+    "id": "u027",
+    "password": "pass",
+    "role": "staff",
+    "name": "白崎 智之",
+    "position": "SV兼コメダ福井地区店長",
+    "defaultStore": "k-takefu",
+    "approveBrand": null
+  },
+  {
+    "id": "u028",
+    "password": "pass",
+    "role": "staff",
+    "name": "森口 嵩史",
+    "position": "社員",
+    "defaultStore": "k-ritto",
+    "approveBrand": null
+  },
+  {
+    "id": "u029",
+    "password": "pass",
+    "role": "staff",
+    "name": "田代 美代子",
+    "position": "アシスト社員",
+    "defaultStore": "k-ritto",
+    "approveBrand": null
+  },
+  {
+    "id": "u030",
+    "password": "pass",
+    "role": "staff",
+    "name": "岩嵜 恒次",
+    "position": "店長",
+    "defaultStore": "p-owada",
+    "approveBrand": null
+  }
+]

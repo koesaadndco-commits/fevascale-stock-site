@@ -37,12 +37,30 @@ Supabase をやめ、reportlink と同じ **Postgres(Vercel/Neon) + Prisma** 構
   - 個人アカウント認証の土台（`lib/auth.js`：scrypt パスワード＋HMAC 署名 Cookie セッション）
   - 環境変数テンプレート（`.env.example`）
   - ※この段階では**アプリ本体は従来どおり Supabase で動作**します（壊さない追加のみ）。
-- **Phase 2（予定）… 切替**
-  - サーバー API（`/api/auth/*`、データ用エンドポイント）を Prisma で実装
-  - クライアントの `sb`（Supabase）を API 互換アダプタへ差し替え、Supabase CDN を撤去
-  - リアルタイム同期は廃止し「更新」ボタンでの手動更新に一本化
+- **Phase 2（完了）… 切替（Supabase 撤去）**
+  - サーバー API を Prisma で実装
+    - 認証：`/api/auth/login`（ユーザーID＋パスワード）・`/logout`・`/me`・`/password`
+    - データ：`/api/data`（Supabase 互換クエリを Prisma で実行。`app_users.password` は返却時に必ず除去）
+  - クライアントの `sb` を `public/sb-adapter.js`（`window.supabase.createClient` 互換）へ差し替え。
+    Supabase CDN は撤去。tanakan-app.js の約 76 箇所の `sb.from(...)` は無改変で動作。
+  - ログインはサーバー側で検証（既存の平文パスワードは初回ログイン時に scrypt へ自動移行）。
+  - リアルタイム同期は廃止（`channel` は no-op）。データ更新は topbar の「更新」ボタンで手動。
+  - ローカル Postgres を立てて **ログイン→ダッシュボード描画→保存→別セッションで再取得** まで検証済み。
 - **Phase 3（予定）… 移行仕上げ**
-  - 既存 Supabase データの移行手順／スクリプト、パスワード初期設定、堅牢化
+  - 既存 Supabase データの移行手順／スクリプト、権限（役割別）認可の厳格化、Next.js のパッチ更新。
+
+### 初回セットアップ（Phase 2 完了後の実行手順）
+
+```bash
+cp .env.example .env         # DATABASE_URL / DATABASE_URL_UNPOOLED / APP_SECRET を設定
+npm install
+npx prisma migrate deploy    # もしくは開発は  npx prisma migrate dev --name init
+npx prisma db seed           # 既定ユーザーを投入（初回ログイン用。パスワードはハッシュ化）
+npm run build && npm run start
+```
+
+既定の管理者は `admin` / `admin`（本番では必ず変更してください）。商品マスタ・店舗・業態は
+管理者の初回ログイン時にアプリが自動投入します。
 
 ### データベースのセットアップ（Phase 1 の受け入れ手順）
 

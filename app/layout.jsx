@@ -1,4 +1,15 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import Script from 'next/script';
+
+// Supabase 互換アダプタ（Postgres/Prisma バックエンド）は tanakan-app.js の
+// トップレベル `supabase.createClient(...)` より前に window.supabase を定義する
+// 必要がある。CDN 依存や next/script の読み込み順に左右されないよう、
+// 同一オリジンのアダプタを <head> にインライン展開して同期実行する。
+const ADAPTER_JS = fs.readFileSync(
+  path.join(process.cwd(), 'public', 'sb-adapter.js'),
+  'utf8',
+);
 
 export const metadata = {
   title: '株式会社アモーレながすぎ 棚卸管理プロダクト「棚簡」',
@@ -35,17 +46,15 @@ export default function RootLayout({ children }) {
         />
         {/* 棚簡のスタイル（埋め込み base64 画像を含むため静的配信） */}
         <link rel="stylesheet" href="/tanakan.css" />
+        {/* Supabase 互換アダプタを同期実行（window.supabase.createClient を定義） */}
+        <script dangerouslySetInnerHTML={{ __html: ADAPTER_JS }} />
       </head>
       <body>
         {children}
-        {/* 外部ライブラリ（グローバル supabase / XLSX を定義）はアプリ本体より前に読み込む */}
+        {/* Excel 出力ライブラリ（グローバル XLSX）。未読込でも中核機能は動作する。 */}
         <Script
           src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"
-          strategy="beforeInteractive"
-        />
-        <Script
-          src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
-          strategy="beforeInteractive"
+          strategy="afterInteractive"
         />
       </body>
     </html>

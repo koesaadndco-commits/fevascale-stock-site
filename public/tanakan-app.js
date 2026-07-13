@@ -5563,40 +5563,33 @@ async function doLogin() {
   try {
     if (btn) { btn.disabled = true; btn.textContent = 'ログイン中...'; }
 
-    // ユーザーデータがまだ未ロードならSupabaseから読み込み
-    if (!State.users || State.users.length === 0) {
-      try {
-        const users = await storage.get('users');
-        State.users = (users && users.length > 0) ? users : DEFAULT_USERS_LIST;
-      } catch (e) {
-        State.users = DEFAULT_USERS_LIST;
-      }
-    }
-
-    // ID + パスワード照合
-    const acct = State.users.find(x => x.id === id);
-    if (!acct || acct.password !== pw) {
-      toast('IDまたはパスワードが違います', 'error');
+    // サーバーで ID + パスワードを照合（app_users をハッシュ検証。平文は自動移行）
+    const res = await sb.auth.signInWithPassword({ email: id, password: pw });
+    const acct = res && res.data && res.data.user;
+    if (!acct || (res && res.error)) {
+      toast((res && res.error && res.error.message) || 'IDまたはパスワードが違います', 'error');
       if (btn) { btn.disabled = false; btn.textContent = 'ログイン'; }
       return;
     }
 
+    const defaultStore = acct.default_store != null ? acct.default_store : acct.defaultStore;
+    const approveBrand = acct.approve_brand != null ? acct.approve_brand : acct.approveBrand;
     State.user = {
       id: acct.id,
       name: acct.name,
       role: acct.role === 'super_admin' ? 'admin' : acct.role,
       isSuperAdmin: acct.role === 'super_admin',
       position: acct.position || '',
-      defaultStore: acct.defaultStore,
-      approveBrand: acct.approveBrand
+      defaultStore: defaultStore,
+      approveBrand: approveBrand
     };
 
     // 残りのデータをロード
     await loadAll();
 
-    if (acct.defaultStore) {
-      State.currentStore = acct.defaultStore;
-      State.brand = brandOf(acct.defaultStore);
+    if (defaultStore) {
+      State.currentStore = defaultStore;
+      State.brand = brandOf(defaultStore);
     }
     startRealtimeSync();
     navigate('dashboard');
