@@ -162,7 +162,8 @@ const sbStorage = (() => {
 
   async function fetchAppUsers() {
     if (!sb) return null;
-    const { data, error } = await sb.from('app_users').select('*').eq('archived', false).order('id');
+    // 停止中（archived=true）も含めて取得し、管理画面で「停止中」として扱う
+    const { data, error } = await sb.from('app_users').select('*').order('id');
     if (error) { const _m = error.message || error.details || error.hint || error.code || JSON.stringify(error); console.error('app_users fetch:', _m, error); _lastDbError = 'ユーザー取得: ' + _m; return null; }
     return data.map(u => ({
       id: u.id,
@@ -171,7 +172,8 @@ const sbStorage = (() => {
       password: u.password || '',
       role: u.role || 'staff',
       approveBrand: u.approve_brand || null,
-      defaultStore: u.default_store || null
+      defaultStore: u.default_store || null,
+      archived: !!u.archived
     }));
   }
 
@@ -185,7 +187,7 @@ const sbStorage = (() => {
       role: u.role || 'staff',
       approve_brand: u.approveBrand || null,
       default_store: u.defaultStore || null,
-      archived: false
+      archived: !!u.archived
     }));
     const { error } = await sb.from('app_users').upsert(rows, { onConflict: 'id' });
     if (error) { const _m = error.message || error.details || error.hint || error.code || JSON.stringify(error); console.error('app_users upsert:', _m, error); _lastDbError = 'ユーザー保存: ' + _m; return false; }
@@ -1319,7 +1321,7 @@ function getHighValueItems(storeId) {
 }
 
 function getStoreStaff(storeId) {
-  return State.users.filter(u => u.role === 'staff' && u.defaultStore === storeId);
+  return State.users.filter(u => !u.archived && u.role === 'staff' && u.defaultStore === storeId);
 }
 
 // =========================================================
@@ -3768,7 +3770,7 @@ function canManageStore(storeId) {
 function soumuBlockReason() {
   for (const s of State.stores) {
     if (!isStoreSigned(s.id)) {
-      const mgr = (State.users || []).find(u => u.role === 'manager' && (u.approveBrand === 'all' || u.approveBrand === s.brand));
+      const mgr = (State.users || []).find(u => !u.archived && u.role === 'manager' && (u.approveBrand === 'all' || u.approveBrand === s.brand));
       return { store: s, managerName: mgr ? mgr.name : '業態責任者' };
     }
   }
@@ -3991,8 +3993,9 @@ function renderInventory() {
 
   // Staff options for person dropdowns
   // Include: (a) staff at this store, (b) all staff/manager at same brand, (c) admin
-  const sameStoreStaff = State.users.filter(u => u.role === 'staff' && u.defaultStore === store.id);
+  const sameStoreStaff = State.users.filter(u => !u.archived && u.role === 'staff' && u.defaultStore === store.id);
   const sameBrandStaff = State.users.filter(u =>
+    !u.archived &&
     (u.role === 'staff' || u.role === 'manager') &&
     u.defaultStore !== store.id && // not duplicating
     (u.defaultStore ? brandOf(u.defaultStore) === store.brand : (u.approveBrand === 'all' || u.approveBrand === store.brand))
@@ -5007,6 +5010,89 @@ function renderAdminSuppliers() {
   `;
 }
 
+// =========================================================
+// ユーザー一覧：Excel 出力 / テンプレDL / 一括取込
+//   取込は「同じID＝上書き・無いID＝追加」の非破壊マージ。
+// =========================================================
+const USER_ROLE_LABEL = { admin:'管理者', manager:'業態責任者', staff:'スタッフ', soumu:'総務', director:'役員' };
+function userRoleToLabel(v){ return USER_ROLE_LABEL[v] || v || 'スタッフ'; }
+function userLabelToRole(s){
+  const t = String(s||'').trim();
+  const hit = Object.keys(USER_ROLE_LABEL).find(k => USER_ROLE_LABEL[k] === t);
+  if (hit) return hit;
+  if (['admin','manager','staff','soumu','director'].includes(t)) return t;
+  return 'staff';
+}
+function userStoreToName(id){ const s=(State.stores||[]).find(x=>x.id===id); return s?s.name:''; }
+function userBrandToLabel(v){ if(v==='all') return '全業態'; if(!v) return ''; const b=(State.brands||[]).find(x=>x.id===v); return b?b.name:v; }
+
+window.userExport = function(){
+  if(typeof XLSX==='undefined'){ toast('Excelライブラリ未読込','error'); return; }
+  const aoa=[['ID','氏名/店舗名','区分','パスワード','権限','所属店舗','承認業態','状態']];
+  (State.users||[]).forEach(u=>{
+    aoa.push([ u.id||'', u.name||'', u.position||'', u.password||'',
+      userRoleToLabel(u.role), userStoreToName(u.defaultStore), userBrandToLabel(u.approveBrand), u.archived?'停止中':'有効' ]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:12},{wch:18},{wch:12},{wch:12},{wch:14},{wch:22},{wch:14},{wch:8}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'ユーザー一覧');
+  XLSX.writeFile(wb,'ユーザー一覧_'+(new Date().toISOString().slice(0,10))+'.xlsx');
+};
+
+window.userTemplate = function(){
+  if(typeof XLSX==='undefined'){ toast('Excelライブラリ未読込','error'); return; }
+  const aoa=[
+    ['ユーザー取込テンプレート（この案内1行は削除可。権限=管理者/業態責任者/スタッフ/総務/役員）'],
+    ['ID','氏名/店舗名','区分','パスワード','権限','所属店舗','承認業態'],
+    ['h-sabae','8番らーめん さばえ店','店舗','pass','スタッフ','8番らーめん さばえ店',''],
+    ['p-owada','ヒョンチャン 大和田店','店舗','pass','スタッフ','ヒョンチャン 大和田店',''],
+    ['mgr-h','8番統括','業態責任者','pass','業態責任者','','8番らーめん'],
+    ['exec1','役員 ○○','役員','pass','役員','','全業態'],
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:12},{wch:18},{wch:12},{wch:12},{wch:14},{wch:22},{wch:14}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'ユーザー取込');
+  XLSX.writeFile(wb,'ユーザー_取込テンプレート.xlsx');
+};
+
+window.userImport = async function(){
+  const file = await pickXlsxFile(); if(!file) return;
+  let rows; try{ rows = await readXlsxAsRows(file); }catch(e){ toast('Excel読込に失敗しました','error'); return; }
+  let hidx=-1;
+  for(let i=0;i<Math.min(rows.length,30);i++){ const r=rows[i]||[]; if(r.some(c=> ['ID','id'].includes(String(c).trim()))){ hidx=i; break; } }
+  if(hidx<0){ toast('ヘッダー行（「ID」列）が見つかりません','error'); return; }
+  const hmap = buildHeaderMap(rows[hidx]);
+  const storeByName={}; (State.stores||[]).forEach(s=>{ storeByName[s.name.trim()]=s.id; storeByName[s.id]=s.id; });
+  const brandByName={'全業態':'all','all':'all'}; (State.brands||[]).forEach(b=>{ brandByName[b.name.trim()]=b.id; brandByName[b.id]=b.id; });
+  const incoming=[]; let skip=0;
+  for(let i=hidx+1;i<rows.length;i++){
+    const r=rows[i]||[]; if(r.every(c=>c===''||c==null)) continue;
+    const id=String(pickCell(r,hmap,'ID','id')||'').trim();
+    if(!id){ skip++; continue; }
+    const storeRaw=String(pickCell(r,hmap,'所属店舗','店舗','店舗名','店舗ID')||'').trim();
+    const brandRaw=String(pickCell(r,hmap,'承認業態','業態')||'').trim();
+    const pw=String(pickCell(r,hmap,'パスワード')||'').trim();
+    incoming.push({
+      id,
+      name:String(pickCell(r,hmap,'氏名/店舗名','氏名','店舗名','名前')||'').trim(),
+      position:String(pickCell(r,hmap,'区分')||'').trim(),
+      password: pw, // 空＝既存のパスワードを変更しない（新規のみ後で既定値を補完）
+      role:userLabelToRole(pickCell(r,hmap,'権限','role')),
+      defaultStore: storeRaw ? (storeByName[storeRaw]||null) : null,
+      approveBrand: brandRaw ? (brandByName[brandRaw]||null) : null
+    });
+  }
+  if(incoming.length===0){ toast('取り込める行がありません','error'); return; }
+  if(!confirm(incoming.length+'件を取り込みます。\n・同じID＝上書き／無いID＝追加\n・パスワード欄が空の行は既存パスワードを変更しません\n・表に無い既存ユーザーは削除しません\nよろしいですか？（スキップ '+skip+'件）')) return;
+  const map={}; (State.users||[]).forEach(u=>{ map[u.id]=u; });
+  incoming.forEach(u=>{ if(!map[u.id] && !u.password) u.password='pass'; map[u.id]=Object.assign({}, map[u.id]||{}, u); });
+  State.users = Object.values(map);
+  const ok = await saveUsers();
+  if(!ok){ toast('保存に失敗しました'+(typeof _lastDbError!=='undefined'&&_lastDbError?('：'+_lastDbError):''),'error'); return; }
+  render();
+  toast(incoming.length+'件を取り込みました','success');
+};
+
 function renderAdminUsers() {
   const stores = State.stores;
   const filter = (State.adminFilter || '').toLowerCase();
@@ -5042,10 +5128,13 @@ function renderAdminUsers() {
       </select>
       <input class="input" id="admin-filter-input" placeholder="氏名/店舗名/IDで絞り込み..." value="${escapeHtml(State.adminFilter || '')}" style="width:200px;">
       <button class="btn btn-primary btn-sm" data-action="add-user">＋ ユーザーを追加</button>
+      <button class="btn btn-outline btn-sm" onclick="userExport()" type="button">📤 Excel出力</button>
+      <button class="btn btn-outline btn-sm" onclick="userImport()" type="button">📥 Excel取込</button>
+      <button class="btn btn-outline btn-sm" onclick="userTemplate()" type="button">⬇ テンプレDL</button>
     </div>
   </div>
   <div class="admin-table">
-    <div class="header" style="grid-template-columns: 80px 130px 100px 110px 110px 1fr 110px 70px;">
+    <div class="header" style="grid-template-columns: 80px 130px 100px 110px 110px 1fr 110px 150px;">
       <div>ID</div>
       <div>氏名/店舗名</div>
       <div>区分</div>
@@ -5056,11 +5145,11 @@ function renderAdminUsers() {
       <div></div>
     </div>
     ${list.map(u => `
-      <div class="admin-row" style="grid-template-columns: 80px 130px 100px 110px 110px 1fr 110px 70px;">
+      <div class="admin-row${u.archived ? ' suspended' : ''}" style="grid-template-columns: 80px 130px 100px 110px 110px 1fr 110px 150px;">
         <div><input class="input" data-edit-user-id="${escapeHtml(u.id)}" data-field="id" value="${escapeHtml(u.id)}" ${u.id === 'admin' ? 'readonly' : ''}></div>
-        <div><input class="input" data-edit-user-id="${escapeHtml(u.id)}" data-field="name" value="${escapeHtml(u.name)}"></div>
+        <div style="display:flex;align-items:center;gap:4px;">${u.archived ? '<span class="user-suspended-badge">停止中</span>' : ''}<input class="input" data-edit-user-id="${escapeHtml(u.id)}" data-field="name" value="${escapeHtml(u.name)}"></div>
         <div><input class="input" data-edit-user-id="${escapeHtml(u.id)}" data-field="position" value="${escapeHtml(u.position || '')}" placeholder="社員/店長など"></div>
-        <div><input class="input" data-edit-user-id="${escapeHtml(u.id)}" data-field="password" value="${escapeHtml(u.password)}" type="text"></div>
+        <div><input class="input" data-edit-user-id="${escapeHtml(u.id)}" data-field="password" value="${escapeHtml(u.password || '')}" type="text" placeholder="変更時のみ入力"></div>
         <div>
           <select class="select" data-edit-user-id="${escapeHtml(u.id)}" data-field="role">
             <option value="admin"   ${u.role === 'admin'   ? 'selected' : ''}>管理者</option>
@@ -5084,9 +5173,13 @@ function renderAdminUsers() {
               .map(b => `<option value="${escapeHtml(b.id)}" ${u.approveBrand === b.id ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('')}
           </select>
         </div>
-        <div class="actions">
-          ${u.id === 'admin' ? '<span class="small muted">削除不可</span>' :
-            `<button class="btn btn-danger btn-sm" data-action="delete-user" data-user-id="${escapeHtml(u.id)}">削除</button>`}
+        <div class="actions" style="display:flex;gap:4px;flex-wrap:wrap;">
+          ${u.id === 'admin' ? '<span class="small muted">—</span>' :
+            (u.archived
+              ? `<button class="btn btn-outline btn-sm" data-action="resume-user" data-user-id="${escapeHtml(u.id)}">再開</button>`
+                + `<button class="btn btn-danger btn-sm" data-action="delete-user" data-user-id="${escapeHtml(u.id)}">削除</button>`
+              : `<button class="btn btn-outline btn-sm" data-action="suspend-user" data-user-id="${escapeHtml(u.id)}">停止</button>`
+                + `<button class="btn btn-danger btn-sm" data-action="delete-user" data-user-id="${escapeHtml(u.id)}">削除</button>`)}
         </div>
       </div>
     `).join('')}
@@ -5524,6 +5617,8 @@ async function handleAction(e) {
     case 'delete-store': await deleteStore(el.dataset.storeId); break;
     case 'add-user': addUserDialog(); break;
     case 'delete-user': await deleteUser(el.dataset.userId); break;
+    case 'suspend-user': await suspendUser(el.dataset.userId); break;
+    case 'resume-user': await resumeUser(el.dataset.userId); break;
     case 'add-supplier': addSupplierDialog(); break;
     case 'delete-supplier': await deleteSupplier(el.dataset.supplier); break;
     case 'download-suppliers-template': await exportSuppliersCSV(); break;
@@ -5976,15 +6071,33 @@ function addUserDialog() {
 async function deleteUser(userId) {
   if (userId === 'admin') { toast('admin は削除できません', 'error'); return; }
   if (userId === State.user.id) { toast('ログイン中のユーザーは削除できません', 'error'); return; }
-  if (!confirm('このユーザーを削除しますか？')) return;
+  if (!confirm('このユーザーを削除しますか？\n（一覧から消えます。停止（非表示）にしたい場合は「停止」を使ってください）')) return;
   State.users = State.users.filter(u => u.id !== userId);
-  // Supabase側でアーカイブフラグを立てる
+  // アーカイブフラグを立てて非表示化（ログイン不可になる）
   if (storage.deleteAppUser) {
     try { await storage.deleteAppUser(userId); } catch (e) { console.error('deleteAppUser', e); }
   }
-  // saveUsersは再度全件upsertするが、archivedレコードは別途handlingされる
-  await saveUsers();
   toast('ユーザーを削除しました', 'success');
+  render();
+}
+
+// 停止（非表示）：ログイン不可・各種一覧に出さない。後から「再開」できる。
+async function suspendUser(userId) {
+  if (userId === 'admin') { toast('admin は停止できません', 'error'); return; }
+  if (userId === State.user.id) { toast('ログイン中のユーザーは停止できません', 'error'); return; }
+  const u = State.users.find(x => x.id === userId); if (!u) return;
+  if (!confirm(`${u.name || userId} を停止（非表示）にしますか？\nログインできなくなります。後から再開できます。`)) return;
+  u.archived = true;
+  const ok = await saveUsers();
+  toast(ok === false ? '保存に失敗しました' : '停止しました（再開できます）', ok === false ? 'error' : 'success');
+  render();
+}
+
+async function resumeUser(userId) {
+  const u = State.users.find(x => x.id === userId); if (!u) return;
+  u.archived = false;
+  const ok = await saveUsers();
+  toast(ok === false ? '保存に失敗しました' : '再開しました', ok === false ? 'error' : 'success');
   render();
 }
 
