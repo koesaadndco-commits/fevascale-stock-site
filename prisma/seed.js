@@ -28,18 +28,12 @@ async function main() {
       default_store: u.defaultStore || null,
       archived: false,
     };
-    // 既存はパスワードを上書きしない（運用中の変更を尊重）。無ければ作成。
+    // 既存ユーザーは一切変更しない（運用中の氏名・権限・パスワードを尊重）。
+    // 無い場合だけ作成する。毎デプロイで実行されても、データ移行後でも安全。
     await prisma.appUser.upsert({
       where: { id: u.id },
       create: row,
-      update: {
-        name: row.name,
-        position: row.position,
-        role: row.role,
-        approve_brand: row.approve_brand,
-        default_store: row.default_store,
-        archived: false,
-      },
+      update: {},
     });
     created++;
   }
