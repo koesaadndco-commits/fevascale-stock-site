@@ -2135,7 +2135,7 @@ function renderFoodLoss(){
         <button class="fl-btn-clear" onclick="flTemplate()" type="button">⬇ 取込テンプレDL</button>
         <button class="fl-btn-clear" onclick="flPrintRanking()" type="button">🖨 ロス実績を印刷</button>
       </div>
-      <span class="hint" style="font-size:11px;color:#94a3b8;display:block;margin-top:6px;">完成品（マスタに無い商品）もそのまま取込可。全店Excel出力時はロスランキングも一緒に出力。社長・常務の押印は棚卸サマリーの確認欄に反映されます。</span>
+      <span class="hint" style="font-size:11px;color:#94a3b8;display:block;margin-top:6px;">完成品（マスタに無い商品）もそのまま取込可。全店Excel出力時はロスランキングも一緒に出力。</span>
     </div>
     <div class="fl-card">
       <h3>入力</h3>
@@ -3444,7 +3444,6 @@ function renderApprovalSection() {
       </div>
       ${banner}
       <div class="approve-status-list">${rows}</div>
-      ${renderSealSection()}
     </div>`;
 }
 
@@ -6767,7 +6766,6 @@ async function exportAllStoresXlsx(brandFilter) {
   if (stores.length === 0) { toast('対象店舗がありません', 'error'); return; }
 
   let _flRows = []; try { _flRows = (await flFetch(currentSlipPeriod())) || []; } catch(_){}
-  let _seal = { president:null, director:null }; try { _seal = await loadSealStampsRaw(State.month); } catch(_){}
 
   const wb = XLSX.utils.book_new();
 
@@ -6785,9 +6783,6 @@ async function exportAllStoresXlsx(brandFilter) {
       sum.push([brandLabel(b), '未承認', '', '']);
     }
   }
-  sum.push([]);
-  sum.push(['【役員確認印】']);
-  sum.push(['社長', _seal.president ? `${_seal.president.name} ㊞  (${fmtStampDate(_seal.president.stamped_at)})` : '（未押印）', '常務', _seal.director ? `${_seal.director.name} ㊞  (${fmtStampDate(_seal.director.stamped_at)})` : '（未押印）']);
   sum.push([]);
   sum.push(['ブランド', '店舗名', '状態', '入力者', '最終発注者', '入力品目数', '高額品目数', '食材(円)', '備品(円)', '合計(円)']);
   let gFood = 0, gSup = 0;
