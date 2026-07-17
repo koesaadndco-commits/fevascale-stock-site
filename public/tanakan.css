@@ -1357,6 +1357,10 @@
   .coin-trophy .ct-name { font-size:18px; font-weight:800; color:#1e293b; }
   .coin-trophy .ct-sub { font-size:12px; color:#64748b; }
   .fl-wrap { max-width:980px; margin:0 auto; }
+  /* 濃紺背景に直接乗るページ見出しは太字白（黒文字だと見えないため） */
+  .fl-page-head h1 { color:#fff !important; font-weight:800; font-size:22px;
+    text-shadow:0 1px 6px rgba(0,0,0,.5); }
+  .fl-page-head { margin-bottom:12px; }
   .fl-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:16px; margin:0 0 14px; box-shadow:0 1px 4px rgba(0,0,0,.04); }
   .fl-card h3 { margin:0 0 12px; font-size:16px; }
   .fl-period { display:inline-block; background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; border-radius:999px; padding:3px 12px; font-size:13px; font-weight:700; }

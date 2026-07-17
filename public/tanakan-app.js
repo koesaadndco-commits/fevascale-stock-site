@@ -2126,7 +2126,7 @@ function renderFoodLoss(){
   const period = State.foodLossPeriod || currentSlipPeriod();
   return `
   <div class="fl-wrap">
-    <div class="p-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="p-header fl-page-head" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <h1 style="margin:0;">🗑️ 食材ロス記録</h1>
       <span class="fl-period">${formatMonth(period)}（21日〜翌20日／20日締め）</span>
     </div>
