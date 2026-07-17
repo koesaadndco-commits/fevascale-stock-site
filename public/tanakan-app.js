@@ -1696,7 +1696,7 @@ function renderTopbar() {
 // アプリのバージョン番号（バージョンアップのたびにここだけ更新すればログイン画面に反映されます）
 const LOGO_KOESA_IMG = '/assets/logo-koesa.png';
 const LOGO_WORDMARK_IMG = '/assets/logo-wordmark.png';
-const APP_VERSION = '0.0.0';
+const APP_VERSION = '1.0.0';
 function renderLogin() {
   return `
   <div class="lx-wrap">
@@ -1709,7 +1709,7 @@ function renderLogin() {
       <div class="lx-product-logo"><img src="${getBranding().stockLogoUrl || LOGO_STOCK_WORDMARK_IMG}" alt="FEVASCALE STOCK"></div>
       <div class="lx-company">${escapeHtml(getBranding().companyName)}</div>
       <div class="lx-tagline">${escapeHtml(getBranding().loginTitle)}${getBranding().loginSubtitle ? `<br><span class="lx-lead" style="font-size:12px;opacity:.8;">${escapeHtml(getBranding().loginSubtitle)}</span>` : ''}</div>
-      <div class="lx-meta"><b id="login-version">Ver. ${APP_VERSION}</b>　│　6.6.2026　developed by Shota Hamabata</div>
+      <div class="lx-meta"><b id="login-version">Ver. ${APP_VERSION}</b>　│　7.17.2026　developed by Shota Hamabata</div>
       <div class="lx-divider">SIGN IN</div>
       <div class="lx-card">
         <label class="lx-field">ユーザーID</label>
