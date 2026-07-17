@@ -1340,6 +1340,8 @@
     box-shadow:0 2px 10px rgba(251,191,36,.30); transition:filter .15s,box-shadow .15s; }
   .coin-entry-btn:hover { filter:brightness(1.05); box-shadow:0 4px 16px rgba(251,191,36,.4); }
   .coin-entry-btn .ic { font-size:30px; flex:0 0 auto; line-height:1; }
+  .fevacoin-ic { display:inline-block; vertical-align:-0.2em; border-radius:50%; object-fit:contain;
+    filter:drop-shadow(0 1px 2px rgba(0,0,0,.25)); }
   .coin-entry-btn .lbl { flex:1; font-size:15px; line-height:1.25; }
   .coin-entry-btn .lbl b { font-size:19px; font-weight:800; letter-spacing:.5px; display:block; color:#3b2706; }
   .coin-entry-btn .chev { font-size:24px; opacity:.7; }

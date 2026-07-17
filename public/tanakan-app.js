@@ -2780,6 +2780,12 @@ async function refreshBadges(){
 //   コンソールの coin フラグONで表示。集計対象は棚卸実施済み(合計>0)の店舗のみ
 // =========================================================
 function coinStoreName(id){ const s=(State.stores||[]).find(x=>x.id===id); return s?s.name:id; }
+// FevaCOIN のリアルコイン画像（未配置でも onerror で 🪙 に自動フォールバック）
+const FEVACOIN_IMG = '/assets/fevacoin.png';
+function coinIcon(px){
+  px = px || 18;
+  return `<img src="${FEVACOIN_IMG}" alt="FevaCOIN" class="fevacoin-ic" style="width:${px}px;height:${px}px;" onerror="this.outerHTML='🪙'">`;
+}
 function coinYear(){ return String(new Date().getFullYear()); }
 
 async function coinLoadConfig(){
@@ -2840,12 +2846,12 @@ function coinStoreBadge(storeId){
   const medal = coinMedalByStore(comp)[storeId];
   const mt = coinMonthTotals(comp)[storeId]||0;
   if(!medal && !mt) return '';
-  return ` <span class="coin-badge">${medal||'🪙'} ${mt}</span>`;
+  return ` <span class="coin-badge">${medal||coinIcon(14)} ${mt}</span>`;
 }
 
 function coinEntryButton(){
   return `<button class="coin-entry-btn" data-action="goto-coins" title="FevaCOINを開く">
-    <span class="ic">🪙</span>
+    <span class="ic">${coinIcon(34)}</span>
     <span class="lbl">優秀店舗の表彰・年間ランキング<br><b>FevaCOIN</b></span>
     <span class="chev">›</span>
   </button>`;
@@ -2904,7 +2910,7 @@ window.coinPrintRanking = function(){
   const yearTop  = Object.entries(coinYearTotals()).sort((a,b)=>b[1]-a[1]);
   const medalOf = (i) => i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'位';
   const rkTable = (title, rows, colName) => {
-    const body = rows.length ? rows.map((r,i)=>`<tr class="${i<3?'rk'+(i+1):''}"><td class="pos">${medalOf(i)}</td><td>${escapeHtml(r.name)}</td><td class="num">🪙 ${r.coins}</td></tr>`).join('')
+    const body = rows.length ? rows.map((r,i)=>`<tr class="${i<3?'rk'+(i+1):''}"><td class="pos">${medalOf(i)}</td><td>${escapeHtml(r.name)}</td><td class="num">${coinIcon(14)} ${r.coins}</td></tr>`).join('')
       : '<tr><td colspan="3" style="color:#94a3b8;">対象データがありません</td></tr>';
     return `<h3>${title}</h3><table class="rk"><thead><tr><th>順位</th><th>${colName}</th><th class="num">コイン</th></tr></thead><tbody>${body}</tbody></table>`;
   };
@@ -2916,7 +2922,7 @@ window.coinPrintRanking = function(){
     'table.rk th,table.rk td{border-bottom:1px solid #e5e7eb;padding:6px 8px;text-align:left;}'+
     'table.rk td.num,table.rk th.num{text-align:right;}table.rk td.pos{font-weight:800;white-space:nowrap;}'+
     'table.rk tr.rk1{background:#fef3c7;}table.rk tr.rk2{background:#eef2f7;}table.rk tr.rk3{background:#ffedd5;}</style></head><body>'+
-    '<h2>🪙 FevaCOIN ランキング</h2><div style="color:#64748b;margin-bottom:6px;">'+formatMonth(State.month)+'</div>'+
+    '<h2>'+coinIcon(22)+' FevaCOIN ランキング</h2><div style="color:#64748b;margin-bottom:6px;">'+formatMonth(State.month)+'</div>'+
     rkTable('🏆 年間ランキング（'+coinYear()+'・確定分）', yearTop.map(([id,c])=>({name:coinStoreName(id),coins:c})), '店舗')+
     rkTable('今月の総合（暫定）', monthTop.map(([id,c])=>({name:coinStoreName(id),coins:c})), '店舗')+
     rkTable('🥗 食材ロスが少ない', catRows(comp.loss), '店舗')+
@@ -2927,7 +2933,7 @@ window.coinPrintRanking = function(){
   w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch(_){} }, 300);
 };
 function coinCatTable(title, arr){
-  const rows = arr.length ? arr.map(a=>`<tr><td>${a.rank}</td><td>${escapeHtml(coinStoreName(a.storeId))}</td><td class="num">🪙 ${a.coins}</td></tr>`).join('')
+  const rows = arr.length ? arr.map(a=>`<tr><td>${a.rank}</td><td>${escapeHtml(coinStoreName(a.storeId))}</td><td class="num">${coinIcon(14)} ${a.coins}</td></tr>`).join('')
     : '<tr><td colspan="3" style="color:#94a3b8;">対象店舗がありません</td></tr>';
   return `<div class="coin-cat"><h4>${title}</h4><table class="fl-table"><thead><tr><th>順位</th><th>店舗</th><th class="num">コイン</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
@@ -2942,10 +2948,10 @@ function renderCoins(){
   const role=State.user?.role; const isAdmin=(role==='admin'||role==='soumu');
   const medal=(i)=> i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'位';
 
-  const monthAward = monthTop.length ? `<div class="coin-trophy"><div class="ct-ic">🏆</div><div><div class="ct-lbl">今月の総合トップ</div><div class="ct-name">${escapeHtml(coinStoreName(monthTop[0][0]))}</div><div class="ct-sub">🪙 ${monthTop[0][1]} コイン（${formatMonth(State.month)}・確定前の暫定）</div></div></div>` : '';
-  const yearAward = yearTop.length ? `<div class="coin-trophy gold"><div class="ct-ic">👑</div><div><div class="ct-lbl">年間トップ（${coinYear()}・確定分）</div><div class="ct-name">${escapeHtml(coinStoreName(yearTop[0][0]))}</div><div class="ct-sub">🪙 ${yearTop[0][1]} コイン</div></div></div>` : '';
+  const monthAward = monthTop.length ? `<div class="coin-trophy"><div class="ct-ic">🏆</div><div><div class="ct-lbl">今月の総合トップ</div><div class="ct-name">${escapeHtml(coinStoreName(monthTop[0][0]))}</div><div class="ct-sub">${coinIcon(14)} ${monthTop[0][1]} コイン（${formatMonth(State.month)}・確定前の暫定）</div></div></div>` : '';
+  const yearAward = yearTop.length ? `<div class="coin-trophy gold"><div class="ct-ic">👑</div><div><div class="ct-lbl">年間トップ（${coinYear()}・確定分）</div><div class="ct-name">${escapeHtml(coinStoreName(yearTop[0][0]))}</div><div class="ct-sub">${coinIcon(14)} ${yearTop[0][1]} コイン</div></div></div>` : '';
 
-  const yearRows = yearTop.length ? yearTop.map(([id,c],i)=>`<tr class="${i<3?('rk'+(i+1)):''}"><td class="coin-rk-pos">${medal(i)}</td><td>${escapeHtml(coinStoreName(id))}</td><td class="num">🪙 ${c}</td></tr>`).join('')
+  const yearRows = yearTop.length ? yearTop.map(([id,c],i)=>`<tr class="${i<3?('rk'+(i+1)):''}"><td class="coin-rk-pos">${medal(i)}</td><td>${escapeHtml(coinStoreName(id))}</td><td class="num">${coinIcon(14)} ${c}</td></tr>`).join('')
     : '<tr><td colspan="3" style="color:#94a3b8;">まだ確定したコインがありません</td></tr>';
 
   const cfg = isAdmin ? `
@@ -2956,7 +2962,7 @@ function renderCoins(){
           ${[0,1,2].map(i=>`<input type="number" style="width:64px" value="${a[i]}" oninput="coinCfgField('${k}',${i},this.value)"> <span style="color:#94a3b8;font-size:12px;">${i+1}位</span>`).join(' ')}</div>`; }).join('')}
       <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-secondary btn-sm" data-action="coin-save-config">設定を保存</button>
-        <button class="btn btn-primary btn-sm" data-action="coin-confirm">🪙 今月のコインを確定する</button>
+        <button class="btn btn-primary btn-sm" data-action="coin-confirm">${coinIcon(16)} 今月のコインを確定する</button>
       </div>
       <div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.6;">確定すると年間ランキング・年間表彰に反映されます。再確定で上書きされます。集計対象は棚卸実施済み（合計>0）の店舗のみ。</div>
     </div>` : '';
@@ -2964,7 +2970,7 @@ function renderCoins(){
   return `
   <div class="fl-wrap">
     <div class="fl-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <h1 style="margin:0;font-size:20px;color:#1e293b;">🪙 FevaCOIN</h1>
+      <h1 style="margin:0;font-size:20px;color:#1e293b;display:flex;align-items:center;gap:8px;">${coinIcon(26)} FevaCOIN</h1>
       <span class="fl-period coin-period">${formatMonth(State.month)}</span>
       <div class="coin-tools">
         <button class="btn btn-secondary btn-sm" onclick="coinExportExcel()" type="button" title="ランキングをExcelで出力">📊 Excel</button>
