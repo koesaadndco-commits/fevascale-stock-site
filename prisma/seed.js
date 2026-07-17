@@ -69,6 +69,10 @@ async function seedDefaultUsers() {
       // （password=admin123 / role=super_admin）へ一度だけ引き上げる。
       // 既にパスワードを変更済みの場合は何も触らない。
       await prisma.appUser.update({ where: { id: 'admin' }, data: { password: row.password, role: row.role } });
+    } else if (u.id === 'admin' && (existing.role !== 'super_admin' || existing.archived)) {
+      // admin は常にスーパーアドミン・有効とする（誤操作による降格・停止から自動復旧。
+      // KOESAコンソールが誰からも開けなくなる事態を防ぐ）。
+      await prisma.appUser.update({ where: { id: 'admin' }, data: { role: 'super_admin', archived: false } });
     }
     created++;
   }
