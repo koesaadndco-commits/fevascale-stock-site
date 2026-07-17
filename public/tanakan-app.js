@@ -1801,12 +1801,20 @@ function slipQtyLabel(l) {
   return (l.unitPrice != null && l.unitPrice !== '') ? q + `（${formatYen(l.unitPrice)}）` : q;
 }
 
-async function loadTransfers() {
-  const period = currentSlipPeriod();
+async function loadTransfers(period) {
+  // ダッシュボードで選択中の月度に連動（未指定時）。既定は今日基準の当月度。
+  period = period || State.slipPeriod || State.month || currentSlipPeriod();
   State.slipPeriod = period;
   const slips = await storage.fetchTransferSlips(period);
   if (slips !== null) State.transferSlips = slips;
 }
+
+// 伝票取引所の月度を1つ前後へ（閲覧用。発行は当月度のみ）
+window.slipChangePeriod = async function(delta){
+  const cur = State.slipPeriod || currentSlipPeriod();
+  await loadTransfers(shiftMonth(cur, delta));
+  render();
+};
 
 
 // =========================================================
@@ -3018,10 +3026,15 @@ function renderTransfers() {
   <div class="slip-page-head">
     <div class="co">株式会社アモーレながすぎ</div>
     <h2>店舗間 売買伝票取引所</h2>
-    <div class="period">${formatMonth(period)}（20日締め・21日〜翌月度）</div>
+    <div class="period" style="display:flex;align-items:center;justify-content:center;gap:10px;">
+      <button class="btn btn-outline btn-sm" onclick="slipChangePeriod(-1)" type="button" title="前の月度">‹</button>
+      <span>${formatMonth(period)}（20日締め・21日〜翌月度）</span>
+      <button class="btn btn-outline btn-sm" onclick="slipChangePeriod(1)" type="button" title="次の月度">›</button>
+    </div>
+    ${period !== currentSlipPeriod() ? `<div style="margin-top:6px;font-size:12px;font-weight:700;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;display:inline-block;padding:3px 10px;">閲覧中：${formatMonth(period)}の伝票（新規発行は当月度のみ）</div>` : ''}
   </div>
   <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-    ${canCreate ? `<button class="btn btn-primary" data-action="new-slip">＋ 新規伝票を作成</button>` : ''}
+    ${canCreate && period === currentSlipPeriod() ? `<button class="btn btn-primary" data-action="new-slip">＋ 新規伝票を作成</button>` : ''}
     <div style="flex:1"></div>
     ${slips.length > 0 ? `<button class="btn btn-secondary btn-sm" data-action="print-slips">🖨 伝票を印刷（A4 6枚/頁）</button>` : ''}
   </div>
@@ -5558,7 +5571,7 @@ async function handleAction(e) {
     case 'release-approval-deadline': await releaseApprovalDeadline(); break;
     case 'confirm-soumu': await confirmSoumu(); break;
     case 'revoke-soumu': await revokeSoumu(); break;
-    case 'goto-transfers': await loadTransfers(); navigate('transfers'); break;
+    case 'goto-transfers': await loadTransfers(State.month || currentSlipPeriod()); navigate('transfers'); break;
     case 'goto-foodloss': if(!getFeatureFlags().foodloss){ toast('食材ロス管理は現在OFFです（KOESAコンソールで有効化）','error'); break; } await loadFoodLoss(); navigate('foodloss'); break;
     case 'goto-breakage': if(!getFeatureFlags().breakage){ toast('器物破損管理は現在OFFです（KOESAコンソールで有効化）','error'); break; } await loadBreakage(); navigate('breakage'); break;
     case 'goto-coins': await loadCoins(); navigate('coins'); break;
