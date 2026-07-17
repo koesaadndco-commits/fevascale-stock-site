@@ -48,11 +48,14 @@ async function seedDefaultUsers() {
     };
     // 既存ユーザーは一切変更しない（運用中の氏名・権限・パスワードを尊重）。
     // 無い場合だけ作成する。毎デプロイで実行されても、データ移行後でも安全。
-    await prisma.appUser.upsert({
-      where: { id: u.id },
-      create: row,
-      update: {},
-    });
+    // 例外: パスワードが空になってしまったユーザーは既定値で修復する
+    // （空のままだとログイン不能のため）。
+    const existing = await prisma.appUser.findUnique({ where: { id: u.id } });
+    if (!existing) {
+      await prisma.appUser.create({ data: row });
+    } else if (!existing.password) {
+      await prisma.appUser.update({ where: { id: u.id }, data: { password: row.password } });
+    }
     created++;
   }
   console.log(`seeded/updated ${created} app_users`);
