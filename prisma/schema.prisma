@@ -1,0 +1,292 @@
+// 棚簡 / FEVASCALE STOCK データモデル（Supabase → Postgres 移行）
+// フィールド名は DB カラム（snake_case）と 1:1 で対応させ、
+// クライアント側の互換アダプタ（Supabase の from().eq('store_id',...) 等）が
+// そのまま扱えるようにしている。
+// 本番は Vercel/Neon の Postgres。ローカルも同じ provider。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // マイグレーションは非プール接続で実行（Neon/Vercel Postgres 用）
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+/// 商品マスタ
+model Item {
+  id              String  @id
+  brand           String
+  category        String?
+  no              Int?
+  name            String
+  supplier        String?
+  unit            String  @default("個")
+  price           Float   @default(0)
+  kind            String  @default("food") // food | supplies
+  seasonal        Boolean @default(false)
+  alert_threshold Float?
+  archived        Boolean @default(false)
+
+  @@index([brand])
+  @@map("items")
+}
+
+/// 店舗マスタ
+model Store {
+  id         String  @id
+  brand      String
+  name       String
+  sort_order Int?
+  archived   Boolean @default(false)
+
+  @@map("stores")
+}
+
+/// 業態（ブランド）マスタ
+model Brand {
+  id         String  @id
+  name       String
+  id_prefix  String?
+  sort_order Int?
+  archived   Boolean @default(false)
+
+  @@map("brands")
+}
+
+/// アプリ利用者（個人アカウント）
+model AppUser {
+  id            String  @id
+  name          String
+  position      String  @default("")
+  password      String  @default("") // ハッシュ化して保存（Phase 2 の認証で使用）
+  role          String  @default("staff") // super_admin|admin|director|soumu|manager|staff
+  approve_brand String?
+  default_store String?
+  archived      Boolean @default(false)
+
+  @@map("app_users")
+}
+
+/// 棚卸の数量（店舗×月×商品）
+model InventoryEntry {
+  store_id   String
+  month      String // YYYY-MM（会計期間 21日〜翌20日）
+  item_id    String
+  quantity   Float   @default(0)
+  note       String?
+  entered_by String?
+
+  @@id([store_id, month, item_id])
+  @@map("inventory_entries")
+}
+
+/// 棚卸のメタ情報（完了・担当・責任者確認）
+model InventoryMeta {
+  store_id          String
+  month             String
+  completed         Boolean   @default(false)
+  completed_at      DateTime?
+  completed_by_name String?
+  input_by          String?
+  order_by          String?
+  mgr_confirmed     Boolean   @default(false)
+  mgr_confirmed_by  String?
+  mgr_confirmed_at  DateTime?
+  mgr_signature     String?
+
+  @@id([store_id, month])
+  @@map("inventory_meta")
+}
+
+/// アラートコメント（店舗×月）
+model AlertComment {
+  store_id           String
+  month              String
+  store_comment      String   @default("")
+  store_comment_by   String   @default("")
+  manager_comment    String   @default("")
+  manager_comment_by String   @default("")
+  updated_by         String?
+  updated_at         DateTime @default(now())
+
+  @@id([store_id, month])
+  @@map("alert_comments")
+}
+
+/// 店舗間 売買伝票
+model TransferSlip {
+  id           String    @id
+  month        String
+  from_store   String
+  to_store     String
+  slip_date    String?
+  slip_time    String?
+  lines        Json      @default("[]")
+  seller_name  String?
+  seller_sig   String?
+  seller_at    DateTime?
+  buyer_name   String?
+  buyer_sig    String?
+  buyer_at     DateTime?
+  buyer_reason String?
+  hq_by        String?
+  hq_at        DateTime?
+  status       String    @default("draft")
+  created_by   String?
+  created_at   DateTime  @default(now())
+
+  @@index([month])
+  @@map("transfer_slips")
+}
+
+/// 仕入先マスタ（業態×名称で一意）
+model Supplier {
+  id              String  @id @default(cuid())
+  brand           String
+  name            String
+  contact         String?
+  memo            String?
+  is_headquarters Boolean @default(false)
+  sort_order      Int?
+  archived        Boolean @default(false)
+
+  @@unique([brand, name])
+  @@map("suppliers")
+}
+
+/// 仕入先メモ（連絡先・備考を JSON 文字列で保持）
+model SupplierNote {
+  supplier String @id
+  note     String // JSON 文字列 {"contact","memo"}
+
+  @@map("supplier_notes")
+}
+
+/// 業態別 月次承認
+model Approval {
+  brand       String
+  month       String
+  approved_by String
+  approved_at DateTime @default(now())
+  signature   String?
+
+  @@id([brand, month])
+  @@map("approvals")
+}
+
+/// 社長・常務の確認印（期間×役割）
+model SealStamp {
+  id         String   @id // `${period}_${role}`
+  period     String
+  role       String // president | director
+  name       String
+  stamped_by String
+  stamped_at DateTime @default(now())
+
+  @@map("seal_stamps")
+}
+
+/// FevaCOIN 付与実績
+model CoinAward {
+  id         String  @id // `${month}_${storeId}_${category}`
+  month      String
+  store_id   String
+  brand      String?
+  category   String // inv | loss | breakage
+  rank       Int
+  coins      Int     @default(0)
+  awarded_by String  @default("")
+
+  @@map("coin_awards")
+}
+
+/// 食材ロス実績
+model FoodLoss {
+  id          String   @id
+  period      String
+  store_id    String
+  brand       String?
+  category    String?
+  staff_name  String?
+  loss_date   String?
+  loss_time   String?
+  item_id     String?
+  item_name   String
+  qty         Float    @default(0)
+  unit        String?
+  reason      String?
+  amount_excl Float    @default(0)
+  created_by  String?
+  created_at  DateTime @default(now())
+
+  @@index([period])
+  @@map("food_loss")
+}
+
+/// 器物破損実績
+model Breakage {
+  id          String   @id
+  period      String
+  store_id    String
+  brand       String?
+  category    String?
+  staff_name  String?
+  loss_date   String?
+  loss_time   String?
+  item_id     String?
+  item_name   String
+  qty         Float    @default(0)
+  unit        String?
+  reason      String?
+  amount_excl Float    @default(0)
+  created_by  String?
+  created_at  DateTime @default(now())
+
+  @@index([period])
+  @@map("breakage")
+}
+
+/// 器物（皿・備品）マスタ
+model BreakageItem {
+  id       String  @id
+  brand    String?
+  name     String
+  unit     String?
+  price    Float   @default(0)
+  stock    Float   @default(0)
+  supplier String?
+
+  @@map("breakage_items")
+}
+
+/// アプリ設定（値は JSON 文字列）
+model AppSetting {
+  key   String @id
+  value String
+
+  @@map("app_settings")
+}
+
+/// アプリ構成（値はスカラー文字列。フラグ・URL・氏名など）
+model AppConfig {
+  key   String @id
+  value String
+
+  @@map("app_config")
+}
+
+/// 認証プロファイル（データ移行の互換用。Phase 2 では app_users を主とする）
+model Profile {
+  id            String  @id
+  login_id      String?
+  name          String
+  role          String  @default("staff")
+  position      String?
+  default_store String?
+  approve_brand String?
+
+  @@map("profiles")
+}

@@ -1,0 +1,34 @@
+{
+  "name": "fevascale-stock-site",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma migrate deploy && next build",
+    "build:app": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:push": "prisma db push"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "overrides": {
+    "postcss": "^8.5.19"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "@vercel/blob": "^2.6.1",
+    "next": "15.5.20",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "pg": "^8.13.1",
+    "prisma": "6.19.3"
+  }
+}
