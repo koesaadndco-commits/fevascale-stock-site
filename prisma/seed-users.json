@@ -1,8 +1,8 @@
 [
   {
     "id": "admin",
-    "password": "admin",
-    "role": "admin",
+    "password": "admin123",
+    "role": "super_admin",
     "name": "管理者",
     "position": "管理者",
     "defaultStore": null,

@@ -14,6 +14,15 @@ function hashPassword(plain) {
   return `scrypt$${salt}$${hash}`;
 }
 
+function verifyPassword(plain, stored) {
+  if (!stored || typeof stored !== 'string') return false;
+  const parts = stored.split('$');
+  if (parts.length !== 3 || parts[0] !== 'scrypt') return false;
+  const calc = crypto.scryptSync(String(plain), parts[1], 64).toString('hex');
+  const a = Buffer.from(calc, 'hex'); const b = Buffer.from(parts[2], 'hex');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 // Supabase からの一度きりのデータ移行（app_config の __data_imported マーカーで管理）
 async function importFromSupabaseOnce() {
   const marker = await prisma.appConfig.findUnique({ where: { key: '__data_imported' } });
@@ -55,6 +64,11 @@ async function seedDefaultUsers() {
       await prisma.appUser.create({ data: row });
     } else if (!existing.password) {
       await prisma.appUser.update({ where: { id: u.id }, data: { password: row.password } });
+    } else if (u.id === 'admin' && verifyPassword('admin', existing.password)) {
+      // 旧初期値(admin/admin)のままの管理者は、正式な初期設定
+      // （password=admin123 / role=super_admin）へ一度だけ引き上げる。
+      // 既にパスワードを変更済みの場合は何も触らない。
+      await prisma.appUser.update({ where: { id: 'admin' }, data: { password: row.password, role: row.role } });
     }
     created++;
   }
