@@ -39,8 +39,6 @@ const TABLES = [
   { name: 'breakage_items', conflict: 'id' },
 ];
 
-const OVERWRITE = process.argv.includes('--overwrite');
-
 function q(id) { return '"' + String(id).replace(/"/g, '""') + '"'; }
 
 async function targetColumns(target, table) {
@@ -57,7 +55,7 @@ async function sourceHasTable(source, table) {
   return rows.length > 0;
 }
 
-async function migrateTable(source, target, table, conflict) {
+async function migrateTable(source, target, table, conflict, overwrite) {
   if (!(await sourceHasTable(source, table))) {
     console.log(`- ${table}: 移行元に無いためスキップ`);
     return;
@@ -71,7 +69,7 @@ async function migrateTable(source, target, table, conflict) {
   const conflictCols = conflict.split(',').map((s) => s.trim());
   const setCols = cols.filter((c) => !conflictCols.includes(c));
 
-  const onConflict = OVERWRITE && setCols.length
+  const onConflict = overwrite && setCols.length
     ? `on conflict (${conflictCols.map(q).join(',')}) do update set ` +
       setCols.map((c) => `${q(c)}=excluded.${q(c)}`).join(',')
     : `on conflict (${conflictCols.map(q).join(',')}) do nothing`;
@@ -80,7 +78,15 @@ async function migrateTable(source, target, table, conflict) {
   await target.query('begin');
   try {
     for (const row of src.rows) {
-      const vals = cols.map((c) => row[c]);
+      const vals = cols.map((c) => {
+        const v = row[c];
+        // json/jsonb 列は JS のオブジェクト/配列で返るため、文字列化して渡す
+        // （そのまま渡すと node-postgres が Postgres 配列として送り json エラーになる）
+        if (v !== null && typeof v === 'object' && !(v instanceof Date) && !Buffer.isBuffer(v)) {
+          return JSON.stringify(v);
+        }
+        return v;
+      });
       const ph = cols.map((_, i) => '$' + (i + 1)).join(',');
       const sql = `insert into ${q(table)} (${cols.map(q).join(',')}) values (${ph}) ${onConflict}`;
       const res = await target.query(sql, vals);
@@ -91,23 +97,23 @@ async function migrateTable(source, target, table, conflict) {
     await target.query('rollback');
     throw new Error(`${table} の移行に失敗: ${e.message}`);
   }
-  console.log(`- ${table}: ${src.rows.length}件中 ${n}件を反映 (${OVERWRITE ? '上書き' : '新規のみ'})`);
+  console.log(`- ${table}: ${src.rows.length}件中 ${n}件を反映 (${overwrite ? '上書き' : '新規のみ'})`);
 }
 
-async function main() {
-  const SOURCE = process.env.SOURCE_DB_URL;
-  const TARGET = process.env.DATABASE_URL;
-  if (!SOURCE || !TARGET) {
-    console.error('SOURCE_DB_URL と DATABASE_URL を環境変数で指定してください。');
-    process.exit(1);
-  }
-  const source = new Client({ connectionString: SOURCE, ssl: { rejectUnauthorized: false } });
-  const target = new Client({ connectionString: TARGET, ssl: TARGET.includes('localhost') || TARGET.includes('127.0.0.1') ? false : { rejectUnauthorized: false } });
+function noSsl(url) { return url.includes('localhost') || url.includes('127.0.0.1'); }
+
+// 移行元(Supabase)→移行先(DATABASE_URL) をコピー。ビルドからも呼べるよう関数化。
+async function migrateFromSupabase({ overwrite = false, sourceUrl, targetUrl } = {}) {
+  const SOURCE = sourceUrl || process.env.SOURCE_DB_URL;
+  const TARGET = targetUrl || process.env.DATABASE_URL;
+  if (!SOURCE || !TARGET) throw new Error('SOURCE_DB_URL と DATABASE_URL が必要です。');
+  const source = new Client({ connectionString: SOURCE, ssl: noSsl(SOURCE) ? false : { rejectUnauthorized: false } });
+  const target = new Client({ connectionString: TARGET, ssl: noSsl(TARGET) ? false : { rejectUnauthorized: false } });
   await source.connect();
   await target.connect();
-  console.log(`移行開始 (${OVERWRITE ? '上書きモード' : '非破壊モード'})`);
+  console.log(`移行開始 (${overwrite ? '上書きモード' : '非破壊モード'})`);
   try {
-    for (const t of TABLES) await migrateTable(source, target, t.name, t.conflict);
+    for (const t of TABLES) await migrateTable(source, target, t.name, t.conflict, overwrite);
     console.log('移行完了。');
   } finally {
     await source.end().catch(() => {});
@@ -115,4 +121,10 @@ async function main() {
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+module.exports = { migrateFromSupabase };
+
+// コマンドラインから直接実行された場合のみ動かす
+if (require.main === module) {
+  migrateFromSupabase({ overwrite: process.argv.includes('--overwrite') })
+    .catch((e) => { console.error(e); process.exit(1); });
+}
