@@ -5014,13 +5014,13 @@ function renderAdminSuppliers() {
 // ユーザー一覧：Excel 出力 / テンプレDL / 一括取込
 //   取込は「同じID＝上書き・無いID＝追加」の非破壊マージ。
 // =========================================================
-const USER_ROLE_LABEL = { admin:'管理者', manager:'業態責任者', staff:'スタッフ', soumu:'総務', director:'役員' };
+const USER_ROLE_LABEL = { super_admin:'スーパー管理者', admin:'管理者', manager:'業態責任者', staff:'スタッフ', soumu:'総務', director:'役員' };
 function userRoleToLabel(v){ return USER_ROLE_LABEL[v] || v || 'スタッフ'; }
 function userLabelToRole(s){
   const t = String(s||'').trim();
   const hit = Object.keys(USER_ROLE_LABEL).find(k => USER_ROLE_LABEL[k] === t);
   if (hit) return hit;
-  if (['admin','manager','staff','soumu','director'].includes(t)) return t;
+  if (['super_admin','admin','manager','staff','soumu','director'].includes(t)) return t;
   return 'staff';
 }
 function userStoreToName(id){ const s=(State.stores||[]).find(x=>x.id===id); return s?s.name:''; }
@@ -5152,6 +5152,7 @@ function renderAdminUsers() {
         <div><input class="input" data-edit-user-id="${escapeHtml(u.id)}" data-field="password" value="${escapeHtml(u.password || '')}" type="text" placeholder="変更時のみ入力"></div>
         <div>
           <select class="select" data-edit-user-id="${escapeHtml(u.id)}" data-field="role">
+            <option value="super_admin" ${u.role === 'super_admin' ? 'selected' : ''}>スーパー管理者</option>
             <option value="admin"   ${u.role === 'admin'   ? 'selected' : ''}>管理者</option>
             <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>業態責任者</option>
             <option value="staff"   ${u.role === 'staff'   ? 'selected' : ''}>スタッフ</option>
