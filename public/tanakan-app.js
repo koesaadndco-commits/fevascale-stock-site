@@ -1792,6 +1792,12 @@ function visibleSlips() {
   return State.transferSlips.filter(s => canCreateSlipFrom(s.fromStore) || canReceiveSlip(s));
 }
 function slipTotal(s) { return (s.lines || []).reduce((a, b) => a + (parseFloat(b.amount) || 0), 0); }
+// 明細の数量表示（無ければ空）。単価があれば「×N（¥単価）」で内訳を示す。
+function slipQtyLabel(l) {
+  if (!l || l.qty == null || l.qty === '') return '';
+  const q = '×' + l.qty;
+  return (l.unitPrice != null && l.unitPrice !== '') ? q + `（${formatYen(l.unitPrice)}）` : q;
+}
 
 async function loadTransfers() {
   const period = currentSlipPeriod();
@@ -2995,7 +3001,7 @@ function renderTransfers() {
         ${statusLabel(s.status)}
         <span class="slip-dt">${escapeHtml(s.date || '')} ${escapeHtml(s.time || '')}</span>
       </div>
-      <table class="slip-lines"><tbody>${(s.lines || []).map(l => `<tr><td>${escapeHtml(l.name)}</td><td class="num">${formatYen(l.amount)}</td></tr>`).join('')}<tr class="tot"><td>合計</td><td class="num">${formatYen(total)}</td></tr></tbody></table>
+      <table class="slip-lines"><tbody>${(s.lines || []).map(l => `<tr><td>${escapeHtml(l.name)}</td><td class="num qty">${escapeHtml(slipQtyLabel(l))}</td><td class="num">${formatYen(l.amount)}</td></tr>`).join('')}<tr class="tot"><td>合計</td><td></td><td class="num">${formatYen(total)}</td></tr></tbody></table>
       <div class="slip-sig-line">販売: ${escapeHtml(s.sellerName || '—')}${s.sellerSig ? ' ㊞' : ''}　購入: ${escapeHtml(s.buyerName || '—')}${s.buyerSig ? ' ㊞' : ''}${s.hqBy ? `　本社: ${escapeHtml(s.hqBy)}` : ''}</div>
       ${s.buyerReason ? `<div class="slip-reason">購入理由: ${escapeHtml(s.buyerReason)}</div>` : ''}
       <div class="slip-actions">
@@ -3028,22 +3034,41 @@ function slipItemOptionsHTML(brand){
   cats.forEach(cat => {
     html += `<optgroup label="${escapeHtml(cat)}">`;
     items.filter(i => (i.category || 'その他') === cat).forEach(it => {
-      html += `<option value="${escapeHtml(it.id)}" data-name="${escapeHtml(it.name)}" data-price="${Number(it.price) || 0}">${escapeHtml(it.name)}</option>`;
+      html += `<option value="${escapeHtml(it.id)}" data-name="${escapeHtml(it.name)}" data-price="${Number(it.price) || 0}" data-unit="${escapeHtml(it.unit || '')}">${escapeHtml(it.name)}（${formatYen(Number(it.price) || 0)}/${escapeHtml(it.unit || '')}）</option>`;
     });
     html += '</optgroup>';
   });
   return html;
 }
+// 数量×単価 → 金額 を再計算（マスター選択時のみ。手入力は金額を直接入力）
+window.slipRecalc = function(i){
+  const qtyEl = document.getElementById('slip-line-qty-' + i);
+  const amtEl = document.getElementById('slip-line-amt-' + i);
+  if (!qtyEl || !amtEl) return;
+  const unit = Number(amtEl.dataset.unitPrice || 0);
+  if (unit > 0) { // マスター選択モード：自動計算
+    const q = parseFloat(qtyEl.value);
+    amtEl.value = q > 0 ? Math.round(unit * q * 100) / 100 : '';
+  }
+};
 window.slipPickItem = function(sel, i){
   const nameEl = document.getElementById('slip-line-name-' + i);
+  const qtyEl  = document.getElementById('slip-line-qty-' + i);
   const amtEl  = document.getElementById('slip-line-amt-' + i);
   if (sel.value) {
+    // マスターから選択：商品名ロック・単価保持・数量×単価で金額を自動計算（金額は読み取り専用）
     const opt = sel.options[sel.selectedIndex];
-    if (nameEl) { nameEl.value = opt.getAttribute('data-name') || ''; nameEl.readOnly = true; nameEl.classList.add('locked'); }
     const p = Number(opt.getAttribute('data-price')) || 0;
-    if (amtEl && p > 0) amtEl.value = p;
+    const unitLabel = opt.getAttribute('data-unit') || '';
+    if (nameEl) { nameEl.value = opt.getAttribute('data-name') || ''; nameEl.readOnly = true; nameEl.classList.add('locked'); }
+    if (qtyEl)  { if (!parseFloat(qtyEl.value)) qtyEl.value = 1; qtyEl.placeholder = unitLabel ? ('数量(' + unitLabel + ')') : '数量'; }
+    if (amtEl)  { amtEl.dataset.unitPrice = String(p); amtEl.readOnly = true; amtEl.classList.add('locked'); }
+    slipRecalc(i);
   } else {
+    // 手入力：商品名・金額を直接入力
     if (nameEl) { nameEl.readOnly = false; nameEl.classList.remove('locked'); nameEl.value = ''; nameEl.focus(); }
+    if (qtyEl)  { qtyEl.placeholder = '数量'; }
+    if (amtEl)  { amtEl.dataset.unitPrice = ''; amtEl.readOnly = false; amtEl.classList.remove('locked'); amtEl.value = ''; }
   }
 };
 window.slipReloadItems = function(){
@@ -3054,7 +3079,11 @@ window.slipReloadItems = function(){
     const sel = document.getElementById('slip-line-pick-' + i);
     if (sel) { sel.innerHTML = opts; sel.value = ''; }
     const nameEl = document.getElementById('slip-line-name-' + i);
-    if (nameEl) { nameEl.readOnly = false; nameEl.classList.remove('locked'); }
+    if (nameEl) { nameEl.readOnly = false; nameEl.classList.remove('locked'); nameEl.value = ''; }
+    const qtyEl = document.getElementById('slip-line-qty-' + i);
+    if (qtyEl) { qtyEl.value = ''; qtyEl.placeholder = '数量'; }
+    const amtEl = document.getElementById('slip-line-amt-' + i);
+    if (amtEl) { amtEl.dataset.unitPrice = ''; amtEl.readOnly = false; amtEl.classList.remove('locked'); amtEl.value = ''; }
   }
 };
 function openCreateSlipModal() {
@@ -3073,6 +3102,7 @@ function openCreateSlipModal() {
     <div class="slip-line-row">
       <select class="select slip-line-pick" id="slip-line-pick-${i}" onchange="slipPickItem(this,${i})">${itemOpts}</select>
       <input class="input" id="slip-line-name-${i}" placeholder="商品名 ${i + 1}（手入力）">
+      <input class="input num" id="slip-line-qty-${i}" type="number" min="0" step="0.01" placeholder="数量" oninput="slipRecalc(${i})">
       <input class="input num" id="slip-line-amt-${i}" type="number" min="0" placeholder="金額">
     </div>`).join('');
   const fromOpts = fromStores.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
@@ -3104,8 +3134,16 @@ function openCreateSlipModal() {
       const lines = [];
       for (let i = 0; i < 5; i++) {
         const nm = document.getElementById('slip-line-name-' + i).value.trim();
-        const amt = parseFloat(document.getElementById('slip-line-amt-' + i).value);
-        if (nm) lines.push({ name: nm, amount: isNaN(amt) ? 0 : amt });
+        const amtEl = document.getElementById('slip-line-amt-' + i);
+        const qty = parseFloat(document.getElementById('slip-line-qty-' + i).value);
+        const amt = parseFloat(amtEl.value);
+        const unit = Number(amtEl.dataset.unitPrice || 0);
+        if (nm) lines.push({
+          name: nm,
+          qty: isNaN(qty) ? null : qty,
+          unitPrice: unit > 0 ? unit : null,
+          amount: isNaN(amt) ? 0 : amt,
+        });
       }
       if (lines.length === 0) { toast('明細を1件以上入力してください', 'error'); return false; }
       const sellerName = document.getElementById('slip-seller-name').value.trim();
@@ -3135,7 +3173,7 @@ function openReceiveSlipModal(id) {
     confirmLabel: '受取を確定する',
     body: `<div class="stack">
       <div class="muted small">${escapeHtml(slipStoreName(s.fromStore))} → ${escapeHtml(slipStoreName(s.toStore))}　合計 ${formatYen(slipTotal(s))}</div>
-      <table class="slip-lines"><tbody>${(s.lines || []).map(l => `<tr><td>${escapeHtml(l.name)}</td><td class="num">${formatYen(l.amount)}</td></tr>`).join('')}</tbody></table>
+      <table class="slip-lines"><tbody>${(s.lines || []).map(l => `<tr><td>${escapeHtml(l.name)}</td><td class="num qty">${escapeHtml(slipQtyLabel(l))}</td><td class="num">${formatYen(l.amount)}</td></tr>`).join('')}</tbody></table>
       <div><label class="field">受取対応者氏名</label><input class="input" id="slip-buyer-name" value="${escapeHtml(u.name || '')}"></div>
       <div><label class="field">購入理由（任意・50文字以内）</label><input class="input" id="slip-buyer-reason" maxlength="50" placeholder="例: 在庫切れのため融通してもらった" value="${escapeHtml(s.buyerReason || '')}"></div>
       <label class="field">認印（受取対応者氏名から自動生成）</label>
@@ -3179,11 +3217,11 @@ async function deleteSlip(id) {
 
 function slipPrintBox(s) {
   const total = slipTotal(s);
-  const lineRows = (s.lines || []).map(l => `<tr><td>${escapeHtml(l.name)}</td><td class="num">${formatYen(l.amount)}</td></tr>`).join('');
+  const lineRows = (s.lines || []).map(l => `<tr><td>${escapeHtml(l.name)}</td><td class="num qty">${escapeHtml(slipQtyLabel(l))}</td><td class="num">${formatYen(l.amount)}</td></tr>`).join('');
   return `<div class="slip-print-box">
     <div class="slip-print-head"><div class="co">株式会社アモーレながすぎ</div><div class="ttl">店舗間 売買伝票</div><div class="meta">${formatMonth(s.month)}　${escapeHtml(s.date || '')} ${escapeHtml(s.time || '')}</div></div>
     <div class="slip-print-route">${escapeHtml(slipStoreName(s.fromStore))} → ${escapeHtml(slipStoreName(s.toStore))}</div>
-    <table class="slip-print-table"><tbody>${lineRows}<tr class="tot"><td>合計</td><td class="num">${formatYen(total)}</td></tr></tbody></table>
+    <table class="slip-print-table"><tbody>${lineRows}<tr class="tot"><td colspan="2">合計</td><td class="num">${formatYen(total)}</td></tr></tbody></table>
     ${s.buyerReason ? `<div class="slip-print-reason">購入理由: ${escapeHtml(s.buyerReason)}</div>` : ''}
     <div class="slip-print-sigs">
       <div class="sig"><div class="lbl">販売 ${escapeHtml(s.sellerName || '')}</div>${s.sellerName ? sealHtml(s.sellerName, 64) : '<div class="noimg"></div>'}</div>

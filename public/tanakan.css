@@ -1426,9 +1426,10 @@
   .slip-page-head h2 { font-size: 20px; margin: 2px 0; color:#eafff6; text-shadow:0 1px 3px rgba(0,0,0,.7); }
   .slip-page-head .period { font-size: 13px; font-weight: 700; color: #fcd34d; text-shadow:0 1px 3px rgba(0,0,0,.7); }
   main > h2 { color:#eafff6; text-shadow:0 1px 3px rgba(0,0,0,.7); }
-  .slip-line-row { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(0,1.35fr) 104px; gap: 8px; margin-bottom: 6px; }
-  @media (max-width:560px){ .slip-line-row { grid-template-columns: 1fr; } }
+  .slip-line-row { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(0,1.2fr) 78px 104px; gap: 8px; margin-bottom: 6px; }
+  @media (max-width:560px){ .slip-line-row { grid-template-columns: 1fr 1fr; } }
   .slip-line-row .input.locked { background:#f8fafc; color:#475569; }
+  .slip-lines td.qty, .slip-print-table td.qty { color:#64748b; white-space:nowrap; text-align:right; }
   .coin-tools { display:flex; gap:8px; margin-left:auto; flex-wrap:wrap; }
   .coin-rk-table tbody tr.rk1 { background:linear-gradient(90deg,#fffbeb,#fef3c7); }
   .coin-rk-table tbody tr.rk2 { background:linear-gradient(90deg,#f8fafc,#eef2f7); }
