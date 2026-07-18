@@ -1706,7 +1706,7 @@ function renderLogin() {
     <div id="lx-faces" class="lx-faces"></div>
     <div id="lx-icons" class="lx-icons"></div>
     <div class="lx-shell">
-      <div class="lx-logo-box"><img src="${getBranding().logoUrl || LOGO_LOGIN_BOX_IMG}" alt="Fevascale Stock 棚簡"></div>
+      <div class="lx-logo-box"><img src="${getBranding().logoUrl || LOGO_LOGIN_BOX_IMG}" alt="Fevascale Stock"></div>
       <div class="lx-platform" style="font-size:11px;letter-spacing:2px;opacity:.8;margin:2px 0 14px;">FEVASCALE SERIES PRODUCT</div>
       <div class="lx-product-logo"><img src="${getBranding().stockLogoUrl || LOGO_STOCK_WORDMARK_IMG}" alt="FEVASCALE STOCK"></div>
       <div class="lx-company">${escapeHtml(getBranding().companyName)}</div>
@@ -4192,7 +4192,7 @@ function renderInventory() {
         <input class="input" id="person-order-other" placeholder="氏名を手入力（複数の場合は全員）" value="${escapeHtml(orderBy)}" ${completed ? 'disabled' : ''}>
       </div>
     </div>
-    <div class="help-line">入力者は、棚簡に入力した方の氏名を手入力してください。最終発注者は、棚卸日到着分の発注をされた方、全員の氏名を手入力してください。</div>
+    <div class="help-line">入力者は、FEVASCALE STOCKに入力した方の氏名を手入力してください。最終発注者は、棚卸日到着分の発注をされた方、全員の氏名を手入力してください。</div>
   </div>
 
   ${inv.completed && canEdit ? `

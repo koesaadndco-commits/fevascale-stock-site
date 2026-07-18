@@ -12,10 +12,10 @@ const ADAPTER_JS = fs.readFileSync(
 );
 
 export const metadata = {
-  title: '株式会社アモーレながすぎ 棚卸管理プロダクト「棚簡」',
+  title: '棚卸管理プロダクト「FEVASCALE STOCK」',
   appleWebApp: {
     capable: true,
-    title: '棚簡',
+    title: 'FEVASCALE STOCK',
   },
   other: {
     'mobile-web-app-capable': 'yes',
