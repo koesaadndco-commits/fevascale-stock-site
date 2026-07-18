@@ -262,6 +262,19 @@ model BreakageItem {
   @@map("breakage_items")
 }
 
+/// 掲示板（Fevascale Stock Bulletin Board）: 棚卸に向けた業態ごとの連絡事項
+model BulletinPost {
+  id          String   @id
+  brand       String   @default("all") // all | 業態ID
+  body        String
+  author_id   String?
+  author_name String   @default("")
+  created_at  DateTime @default(now())
+
+  @@index([brand])
+  @@map("bulletin_posts")
+}
+
 /// アプリ設定（値は JSON 文字列）
 model AppSetting {
   key   String @id

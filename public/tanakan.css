@@ -1342,6 +1342,29 @@
   .coin-entry-btn .ic { font-size:30px; flex:0 0 auto; line-height:1; }
   .fevacoin-ic { display:inline-block; vertical-align:-0.2em; border-radius:50%; object-fit:contain;
     filter:drop-shadow(0 1px 2px rgba(0,0,0,.25)); }
+
+  /* Fevascale Stock Bulletin Board（掲示板） */
+  .bb-section { }
+  .bb-note { font-size:12px; color:#64748b; margin-bottom:8px; }
+  .bb-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .bb-tab { background:#fff; border:1px solid #cbd5e1; border-radius:999px; padding:5px 14px;
+    font-size:13px; font-weight:700; color:#475569; cursor:pointer; }
+  .bb-tab.active { background:#0f766e; border-color:#0f766e; color:#fff; }
+  .bb-form { display:flex; gap:8px; align-items:flex-end; margin-bottom:10px; flex-wrap:wrap; }
+  .bb-form textarea { flex:1; min-width:220px; border:1px solid #cbd5e1; border-radius:10px;
+    padding:9px 12px; font-size:14px; font-family:inherit; resize:vertical; }
+  .bb-form textarea:focus { outline:none; border-color:#0f766e; }
+  .bb-list { display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto; }
+  .bb-post { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px 12px; }
+  .bb-post-head { display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:3px; }
+  .bb-chip { background:#e0f2fe; color:#075985; border-radius:6px; padding:1px 8px; font-weight:700; }
+  .bb-chip.all { background:#f1f5f9; color:#475569; }
+  .bb-author { font-weight:700; color:#1e293b; }
+  .bb-time { color:#94a3b8; }
+  .bb-del { margin-left:auto; background:none; border:none; color:#94a3b8; cursor:pointer; font-size:13px; }
+  .bb-del:hover { color:#dc2626; }
+  .bb-body { font-size:14px; color:#1e293b; white-space:pre-wrap; line-height:1.5; }
+  .bb-empty { font-size:13px; color:#94a3b8; padding:8px 2px; }
   .coin-entry-btn .lbl { flex:1; font-size:15px; line-height:1.25; }
   .coin-entry-btn .lbl b { font-size:19px; font-weight:800; letter-spacing:.5px; display:block; color:#3b2706; }
   .coin-entry-btn .chev { font-size:24px; opacity:.7; }

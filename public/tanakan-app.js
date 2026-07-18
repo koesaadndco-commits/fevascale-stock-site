@@ -941,6 +941,7 @@ async function loadAll() {
       storage.get('users').catch(() => null),
       storage.get('supplier_notes').catch(() => null),
       sbStorage.get('suppliers_by_brand').catch(() => null),
+      loadBulletins().catch(() => null),
     ]);
   } catch (e) {
     console.error('loadAll prefetch error', e);
@@ -1338,6 +1339,7 @@ async function refreshData() {
     State.items = await sbStorage.get('master_items') || State.items;
     State.stores = await sbStorage.get('stores') || State.stores;
     await loadInventory(State.month);
+    try { await loadBulletins(); } catch (e) {}
     try {
       const s = await storage.get('app_settings');
       State.deadlines = (s && s.deadlines) || State.deadlines || {};
@@ -1799,6 +1801,90 @@ function slipQtyLabel(l) {
   if (!l || l.qty == null || l.qty === '') return '';
   const q = '×' + l.qty;
   return (l.unitPrice != null && l.unitPrice !== '') ? q + `（${formatYen(l.unitPrice)}）` : q;
+}
+
+// =========================================================
+// Fevascale Stock Bulletin Board（掲示板）
+//   棚卸に向けて、業態責任者・店長がブランドごとに連絡事項を共有
+//   （渡せる食材・注意事項など）。ダッシュボードのボタン群の下に表示。
+// =========================================================
+async function loadBulletins() {
+  if (!sb) return;
+  const { data, error } = await sb.from('bulletin_posts').select('*')
+    .order('created_at', { ascending: false }).limit(100);
+  if (!error && data) {
+    State.bulletins = data.map(r => ({
+      id: r.id, brand: r.brand || 'all', body: r.body || '',
+      authorId: r.author_id || null, authorName: r.author_name || '',
+      createdAt: r.created_at,
+    }));
+  }
+}
+window.bulletinSetBrand = function (b) { State.bulletinBrand = b; render(); };
+window.bulletinPost = async function () {
+  const ta = document.getElementById('bulletin-input');
+  const body = (ta && ta.value || '').trim();
+  if (!body) { toast('連絡事項を入力してください', 'error'); return; }
+  if (body.length > 500) { toast('500文字以内で入力してください', 'error'); return; }
+  const brand = State.bulletinBrand || 'all';
+  const row = {
+    id: 'bb' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    brand, body,
+    author_id: State.user?.id || null,
+    author_name: State.user?.name || '',
+  };
+  const { error } = await sb.from('bulletin_posts').upsert([row], { onConflict: 'id' });
+  if (error) { toast('投稿に失敗：' + (error.message || ''), 'error'); return; }
+  await loadBulletins();
+  toast('掲示板に投稿しました', 'success');
+  render();
+};
+window.bulletinDelete = async function (id) {
+  const p = (State.bulletins || []).find(x => x.id === id);
+  if (!p) return;
+  const isAdmin = State.user?.role === 'admin';
+  if (!isAdmin && p.authorId !== State.user?.id) { toast('自分の投稿のみ削除できます', 'error'); return; }
+  if (!confirm('この投稿を削除しますか？')) return;
+  const { error } = await sb.from('bulletin_posts').delete().eq('id', id);
+  if (error) { toast('削除に失敗', 'error'); return; }
+  await loadBulletins();
+  render();
+};
+function bulletinBrandLabel(b) {
+  if (b === 'all') return '全体';
+  const br = (State.brands || []).find(x => x.id === b);
+  return br ? br.name : b;
+}
+function renderBulletinBoard() {
+  const posts = State.bulletins || [];
+  const cur = State.bulletinBrand || 'all';
+  const tabs = [{ id: 'all', name: '全体' }].concat(
+    (State.brands || []).slice().sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)));
+  const shown = cur === 'all' ? posts : posts.filter(p => p.brand === cur || p.brand === 'all');
+  const isAdmin = State.user?.role === 'admin';
+  const fmtT = (t) => { try { return new Date(t).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
+  const list = shown.length === 0
+    ? '<div class="bb-empty">まだ投稿はありません。渡せる食材や注意事項を共有しましょう。</div>'
+    : shown.map(p => `
+      <div class="bb-post">
+        <div class="bb-post-head">
+          <span class="bb-chip ${p.brand === 'all' ? 'all' : ''}">${escapeHtml(bulletinBrandLabel(p.brand))}</span>
+          <span class="bb-author">${escapeHtml(p.authorName)}</span>
+          <span class="bb-time">${fmtT(p.createdAt)}</span>
+          ${(isAdmin || p.authorId === State.user?.id) ? `<button class="bb-del" onclick="bulletinDelete('${escapeHtml(p.id)}')" title="削除">✕</button>` : ''}
+        </div>
+        <div class="bb-body">${escapeHtml(p.body)}</div>
+      </div>`).join('');
+  return `
+  <fieldset class="dash-section bb-section"><legend>📌 Fevascale Stock Bulletin Board</legend>
+    <div class="bb-note">棚卸に向けた連絡事項（渡せる食材・注意事項など）を業態ごとに共有できます。</div>
+    <div class="bb-tabs">${tabs.map(t => `<button class="bb-tab ${cur === t.id ? 'active' : ''}" onclick="bulletinSetBrand('${escapeHtml(t.id)}')" type="button">${escapeHtml(t.name)}</button>`).join('')}</div>
+    <div class="bb-form">
+      <textarea id="bulletin-input" rows="2" maxlength="500" placeholder="例：キャベツ2玉 余っています。必要な店舗はご連絡ください／冷凍庫の在庫は20日までに確認をお願いします"></textarea>
+      <button class="btn btn-primary btn-sm" onclick="bulletinPost()" type="button">投稿（${escapeHtml(bulletinBrandLabel(cur))}）</button>
+    </div>
+    <div class="bb-list">${list}</div>
+  </fieldset>`;
 }
 
 async function loadTransfers(period) {
@@ -2851,7 +2937,7 @@ function coinStoreBadge(storeId){
 
 function coinEntryButton(){
   return `<button class="coin-entry-btn" data-action="goto-coins" title="FevaCOINを開く">
-    <span class="ic">${coinIcon(34)}</span>
+    <span class="ic">${coinIcon(52)}</span>
     <span class="lbl">優秀店舗の表彰・年間ランキング<br><b>FevaCOIN</b></span>
     <span class="chev">›</span>
   </button>`;
@@ -2970,7 +3056,7 @@ function renderCoins(){
   return `
   <div class="fl-wrap">
     <div class="fl-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <h1 style="margin:0;font-size:20px;color:#1e293b;display:flex;align-items:center;gap:8px;">${coinIcon(26)} FevaCOIN</h1>
+      <h1 style="margin:0;font-size:20px;color:#1e293b;display:flex;align-items:center;gap:8px;">${coinIcon(34)} FevaCOIN</h1>
       <span class="fl-period coin-period">${formatMonth(State.month)}</span>
       <div class="coin-tools">
         <button class="btn btn-secondary btn-sm" onclick="coinExportExcel()" type="button" title="ランキングをExcelで出力">📊 Excel</button>
@@ -3310,6 +3396,8 @@ ${getFeatureFlags().breakage ? `    <button class="kbreak-entry-btn" data-action
     </button>` : ''}
     ${getFeatureFlags().coin ? coinEntryButton() : ''}
   </div>
+
+  ${renderBulletinBoard()}
 
   <fieldset class="dash-section"><legend>📊 棚卸進捗状況</legend>
     ${renderSoumuConfirmSection()}
