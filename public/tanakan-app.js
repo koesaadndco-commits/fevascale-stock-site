@@ -1732,7 +1732,7 @@ function renderLogin() {
         return `<div class="lx-city"><div class="lx-coin" style="${_anim}"><img class="lx-coin-face lx-coin-front" src="${_cl}" alt="KOESA"><img class="lx-coin-face lx-coin-back" src="${_cl}" alt=""></div></div>`;
       })()}
       <div class="lx-meta" style="margin-top:14px;"><b id="login-version">Ver. ${APP_VERSION}</b>　│　6.6.2026　developed by Shota Hamabata</div>
-      <div class="lx-copy">© 2026 Shota Hamabata. All rights reserved.</div>
+      <div class="lx-copy">© 2026 Produced By KOESA CO.,LTD. All rights reserved.</div>
     </div>
   </div>`;
 }
