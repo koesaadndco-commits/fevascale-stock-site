@@ -1575,3 +1575,9 @@
   @keyframes lxSpinY{ from{transform:rotateY(0deg)} to{transform:rotateY(360deg)} }
   .lx-copy{ font-size:12.5px; letter-spacing:.05em; margin-top:-2px; padding-bottom:4px; color:#e0bd66; text-shadow:0 0 8px rgba(243,194,90,.4); }
   @media(max-width:400px){ .lx-logo-box{width:170px;height:auto;} .lx-shell{max-width:350px;} .lx-city{max-width:112px;} .lx-product{font-size:30px;} .lx-product-logo{max-width:240px;} }
+
+/* 処理中オーバーレイ */
+#busy-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.55); z-index: 99999; display: none; align-items: center; justify-content: center; }
+#busy-overlay .busy-box { background: #fff; border-radius: 14px; padding: 20px 28px; font-weight: 700; font-size: 15px; color: #1e293b; box-shadow: 0 10px 40px rgba(0,0,0,.35); display: flex; align-items: center; gap: 14px; max-width: 90vw; }
+#busy-overlay .busy-spin { width: 26px; height: 26px; border: 3.5px solid #e2e8f0; border-top-color: #0f766e; border-radius: 50%; animation: busyspin .8s linear infinite; flex: none; }
+@keyframes busyspin { to { transform: rotate(360deg); } }
