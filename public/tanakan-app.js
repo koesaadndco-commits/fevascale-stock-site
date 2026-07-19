@@ -7005,12 +7005,14 @@ async function exportAllStoresXlsx(brandFilter) {
   sum.push([]);
   // Approval status
   sum.push(['【業態責任者 承認状況】']);
-  for (const b of ['hachiban', 'komeda']) {
-    const a = State.approvals[b];
+  // 全ブランドを動的に出力（並び順はブランド設定に従う）
+  const _apBrands = (State.brands || []).slice().sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+  for (const bb of _apBrands) {
+    const a = State.approvals[bb.id];
     if (a) {
-      sum.push([brandLabel(b), '✓ 承認済', `承認者: ${a.by}`, `承認日時: ${new Date(a.at).toLocaleString('ja-JP')}`]);
+      sum.push([bb.name, '✓ 承認済', `承認者: ${a.by}`, `承認日時: ${new Date(a.at).toLocaleString('ja-JP')}`]);
     } else {
-      sum.push([brandLabel(b), '未承認', '', '']);
+      sum.push([bb.name, '未承認', '', '']);
     }
   }
   sum.push([]);
@@ -7094,7 +7096,7 @@ async function exportAllStoresXlsx(brandFilter) {
     used.add(unique);
     XLSX.utils.book_append_sheet(wb, ws, unique);
   }
-  const label = brandFilter === 'hachiban' ? '8番' : brandFilter === 'komeda' ? 'コメダ' : '全店';
+  const label = (!brandFilter || brandFilter === 'all') ? '全店' : brandLabel(brandFilter);
   XLSX.writeFile(wb, `棚卸_${label}_${State.month}.xlsx`);
   toast(`${stores.length}店舗をExcel出力しました`, 'success');
 }
