@@ -962,8 +962,9 @@ async function loadAll() {
     items = { hachiban: DEFAULT_HACHIBAN_ITEMS, komeda: DEFAULT_KOMEDA_ITEMS, hyonchan: [] };
     await storage.set('master_items', items);
   } else {
-    if (!items.hachiban || items.hachiban.length === 0) items.hachiban = DEFAULT_HACHIBAN_ITEMS;
-    if (!items.komeda   || items.komeda.length   === 0) items.komeda   = DEFAULT_KOMEDA_ITEMS;
+    // 空の業態に初期マスタを自動復元しない（「全削除」したのに復活してしまうため）
+    if (!items.hachiban) items.hachiban = [];
+    if (!items.komeda)   items.komeda   = [];
     if (!items.hyonchan) items.hyonchan = [];
   }
   // 全ブランド（カスタム追加分含む）について空配列を保証
@@ -3096,7 +3097,8 @@ function renderTransfers() {
     const total = slipTotal(s);
     const canRecv = s.status === 'sent' && canReceiveSlip(s);
     const canApp = s.status === 'received' && canHqApprove();
-    const canDel = s.status === 'sent' && (canCreateSlipFrom(s.fromStore) || State.user?.role === 'admin');
+    const isMgrUp = ['manager', 'admin', 'super_admin'].includes(State.user?.role);
+    const canDel = isMgrUp || (s.status === 'sent' && canCreateSlipFrom(s.fromStore));
     return `<div class="slip-card">
       <div class="slip-card-head">
         <span class="slip-route">${escapeHtml(slipStoreName(s.fromStore))} <span class="arr">→</span> ${escapeHtml(slipStoreName(s.toStore))}</span>
@@ -3314,9 +3316,14 @@ async function hqApproveSlip(id) {
 
 async function deleteSlip(id) {
   const s = State.transferSlips.find(x => x.id === id); if (!s) return;
-  if (!(canCreateSlipFrom(s.fromStore) || State.user?.role === 'admin')) { toast('権限がありません', 'error'); return; }
-  if (s.status !== 'sent') { toast('受取・承認済の伝票は削除できません', 'error'); return; }
-  if (!confirm('この伝票を削除しますか？')) return;
+  const isMgrUp = ['manager', 'admin', 'super_admin'].includes(State.user?.role);
+  // 業態責任者以上はどの状態の伝票も削除可。それ以外は発行店舗が「受取待ち」の間のみ
+  if (!isMgrUp) {
+    if (!canCreateSlipFrom(s.fromStore)) { toast('権限がありません', 'error'); return; }
+    if (s.status !== 'sent') { toast('受取・承認済の伝票の削除は業態責任者以上のみ可能です', 'error'); return; }
+  }
+  const warn = s.status !== 'sent' ? '\n※ 受取・承認済の伝票です。削除すると集計からも除外されます。' : '';
+  if (!confirm(`この伝票を削除しますか？\n${slipStoreName(s.fromStore)} → ${slipStoreName(s.toStore)}（${formatYen(slipTotal(s))}）${warn}`)) return;
   const ok = await storage.deleteTransferSlip(id);
   if (ok === false) { toast('削除に失敗：' + (_lastDbError || ''), 'error'); return; }
   await loadTransfers(); toast('削除しました', 'success'); render();
