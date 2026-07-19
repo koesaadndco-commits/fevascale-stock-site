@@ -1712,7 +1712,6 @@ function renderLogin() {
       <div class="lx-product-logo"><img src="${getBranding().stockLogoUrl || LOGO_STOCK_WORDMARK_IMG}" alt="FEVASCALE STOCK"></div>
       <div class="lx-company">${escapeHtml(getBranding().companyName)}</div>
       <div class="lx-tagline">${escapeHtml(getBranding().loginTitle)}${getBranding().loginSubtitle ? `<br><span class="lx-lead" style="font-size:12px;opacity:.8;">${escapeHtml(getBranding().loginSubtitle)}</span>` : ''}</div>
-      <div class="lx-meta"><b id="login-version">Ver. ${APP_VERSION}</b>　│　6.6.2026　developed by Shota Hamabata</div>
       <div class="lx-divider">SIGN IN</div>
       <div class="lx-card">
         <label class="lx-field">ユーザーID</label>
@@ -1732,6 +1731,7 @@ function renderLogin() {
         const _anim = getBranding().cityRotate ? `animation:lxSpinY ${_sec}s linear infinite;` : '';
         return `<div class="lx-city"><div class="lx-coin" style="${_anim}"><img class="lx-coin-face lx-coin-front" src="${_cl}" alt="KOESA"><img class="lx-coin-face lx-coin-back" src="${_cl}" alt=""></div></div>`;
       })()}
+      <div class="lx-meta" style="margin-top:14px;"><b id="login-version">Ver. ${APP_VERSION}</b>　│　6.6.2026　developed by Shota Hamabata</div>
       <div class="lx-copy">© 2026 Shota Hamabata. All rights reserved.</div>
     </div>
   </div>`;
@@ -4958,8 +4958,8 @@ function renderAdminItems(brand) {
 
   return `
   <div class="row between" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-    <div>
-      <strong>${items.length}</strong> 品目登録中
+    <div style="color:#fff;font-weight:700;">
+      <strong style="color:#fff;">${items.length}</strong> 品目登録中
       ${seasonalCount > 0 ? `<span class="badge" style="background:#fef3c7;color:#a16207;margin-left:8px;">季節 ${seasonalCount}</span>` : ''}
     </div>
     <div class="row" style="gap:6px;flex-wrap:wrap;">
