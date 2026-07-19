@@ -6,6 +6,7 @@ import Script from 'next/script';
 // トップレベル `supabase.createClient(...)` より前に window.supabase を定義する
 // 必要がある。CDN 依存や next/script の読み込み順に左右されないよう、
 // 同一オリジンのアダプタを <head> にインライン展開して同期実行する。
+const BUILD = (process.env.VERCEL_GIT_COMMIT_SHA || String(Date.now())).slice(0, 8);
 const ADAPTER_JS = fs.readFileSync(
   path.join(process.cwd(), 'public', 'sb-adapter.js'),
   'utf8',
@@ -45,7 +46,7 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
         {/* 棚簡のスタイル（埋め込み base64 画像を含むため静的配信） */}
-        <link rel="stylesheet" href="/tanakan.css" />
+        <link rel="stylesheet" href={`/tanakan.css?v=${BUILD}`} />
         {/* Supabase 互換アダプタを同期実行（window.supabase.createClient を定義） */}
         <script dangerouslySetInnerHTML={{ __html: ADAPTER_JS }} />
       </head>
