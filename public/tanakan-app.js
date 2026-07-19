@@ -4959,6 +4959,7 @@ function renderAdminItems(brand) {
       <button class="btn btn-secondary btn-sm" data-action="download-items-template" data-brand="${brand}" title="商品マスター取込み用のExcelテンプレートをダウンロード">📋 テンプレートDL</button>
       <button class="btn btn-secondary btn-sm" data-action="import-items-xlsx" data-brand="${brand}" title="Excelファイルから商品をまとめて登録">📤 Excel取込み</button>
       <button class="btn btn-primary btn-sm" data-action="add-item" data-brand="${brand}">＋ 商品を追加</button>
+      <button class="btn btn-outline btn-sm" data-action="delete-all-items" data-brand="${brand}" title="この業態の商品マスターを全件削除（やり直し用）" style="color:#b91c1c;border-color:#fca5a5;">🗑 全削除</button>
     </div>
   </div>
 
@@ -5774,6 +5775,7 @@ async function handleAction(e) {
     case 'export-all-xlsx': await exportAllStoresXlsx(el.dataset.brand); break;
     case 'download-items-template': await exportItemsTemplateXlsx(el.dataset.brand); break;
     case 'import-items-xlsx': importItemsFromXlsx(el.dataset.brand); break;
+    case 'delete-all-items': deleteAllItems(el.dataset.brand); break;
     case 'download-inv-template': await exportInventoryTemplateXlsx(el.dataset.storeId); break;
     case 'import-inv-xlsx': importInventoryFromXlsx(el.dataset.storeId); break;
   }
@@ -7353,38 +7355,70 @@ async function importItemsFromXlsx(brand) {
       </div>`,
     confirmLabel: '取込みを実行',
     onConfirm: async () => {
+      if (window._masterImportBusy) return false; // 二重実行防止
+      window._masterImportBusy = true;
+      let importFailed = false;
+      try {
+      const total = updates.length + newItems.length;
+      showBusy(`取込み準備中…（全${total}件）`);
       // 最新マスタへ同期してから採番・書き込み（他端末の追加と衝突しないように）
       const freshImp = await sbStorage.get('master_items');
       if (freshImp && typeof freshImp === 'object') State.items = freshImp;
       if (!State.items[brand]) State.items[brand] = [];
-      // 更新適用（既存1件ずつDBへ＝全件上書きしない）
-      let importFailed = false;
+      let done = 0;
+      const toRow = (it) => ({
+        id: it.id, brand, category: it.category, no: it.no || null,
+        name: it.name, supplier: it.supplier || null, unit: it.unit || '個',
+        price: it.price || 0, kind: it.kind || 'food', seasonal: !!it.seasonal,
+        alert_threshold: (it.alertThreshold == null ? null : it.alertThreshold),
+        archived: false
+      });
+      // 更新：50件ずつまとめて一括保存（従来の1件ずつ→大幅高速化）
+      const updTargets = [];
       for (const u of updates) {
         const target = (State.items[brand] || []).find(i => i.id === u.existing.id) || u.existing;
         Object.assign(target, u.patch);
-        const ok = await storage.updateItem(brand, target);
-        if (ok === false) { importFailed = true; break; }
+        updTargets.push(target);
       }
-      // 新規ID採番＋INSERT。ID衝突時は番号を繰り上げて自動リトライ
+      for (let i = 0; i < updTargets.length && !importFailed; i += 50) {
+        const chunk = updTargets.slice(i, i + 50).map(toRow);
+        updateBusy(`更新を保存中… ${Math.min(i + 50, updTargets.length)}/${updTargets.length}件`);
+        const { error } = await sb.from('items').upsert(chunk, { onConflict: 'id' });
+        if (error) { _lastDbError = '商品マスタ一括更新: ' + (error.message || ''); importFailed = true; break; }
+        done += chunk.length;
+      }
+      // 新規：IDを先に採番して50件ずつ一括INSERT（衝突時のみ1件ずつ再試行）
       const brandObjImp = (State.brands || []).find(b => b.id === brand);
       const prefix = (brandObjImp && brandObjImp.idPrefix) ? brandObjImp.idPrefix : brand.charAt(0);
       const used = new Set((State.items[brand] || []).map(it => it.id));
       let n = (State.items[brand] || []).length + 1;
+      const prepared = [];
       for (const itemData of newItems) {
-        if (importFailed) break;
         const { _supInfo, ...itemCore } = itemData;
-        let saved = false;
-        for (let tries = 0; tries < 50 && !saved; tries++) {
-          let id;
-          do { id = `${prefix}${String(n).padStart(4, '0')}`; n++; } while (used.has(id));
-          const newItem = { id, ...itemCore };
-          const res = await storage.insertItem(brand, newItem);
-          if (res.ok) { used.add(id); State.items[brand].push(newItem); saved = true; }
-          else if (res.conflict) { used.add(id); continue; } // 他端末が同番号で先に追加 → 次番号で再挑戦
-          else { importFailed = true; break; }
+        let id;
+        do { id = `${prefix}${String(n).padStart(4, '0')}`; n++; } while (used.has(id));
+        used.add(id);
+        prepared.push({ id, ...itemCore });
+      }
+      for (let i = 0; i < prepared.length && !importFailed; i += 50) {
+        const chunk = prepared.slice(i, i + 50);
+        updateBusy(`新規登録中… ${Math.min(i + 50, prepared.length)}/${prepared.length}件`);
+        const { error } = await sb.from('items').insert(chunk.map(toRow));
+        if (!error) { chunk.forEach(it => State.items[brand].push(it)); done += chunk.length; continue; }
+        // 一括で衝突した場合のみ、この塊だけ1件ずつ再試行（他端末との同時追加対策）
+        for (const it of chunk) {
+          let saved = false;
+          for (let tries = 0; tries < 50 && !saved; tries++) {
+            const res = await storage.insertItem(brand, it);
+            if (res.ok) { State.items[brand].push(it); saved = true; }
+            else if (res.conflict) { do { it.id = `${prefix}${String(n).padStart(4, '0')}`; n++; } while (used.has(it.id)); used.add(it.id); }
+            else { importFailed = true; break; }
+          }
+          if (importFailed) break;
+          done++;
         }
       }
-      if (importFailed) { toast('取込中に保存エラー：' + (_lastDbError || '通信エラー'), 'error'); return false; }
+      if (importFailed) { hideBusy(); toast('取込中に保存エラー：' + (_lastDbError || '通信エラー'), 'error'); return false; }
 
       // 仕入先情報をsupplierNotesに反映（同じ仕入先の最後の値を採用）
       if (!State.supplierNotes) State.supplierNotes = {};
@@ -7408,6 +7442,42 @@ async function importItemsFromXlsx(brand) {
       const supMsg = supplierUpdated > 0 ? ` / 仕入先情報${supplierUpdated}件` : '';
       toast(`商品マスターを更新しました（新規${newItems.length}件 / 更新${updates.length}件${supMsg}）`, 'success');
       return true;
+      } finally { window._masterImportBusy = false; hideBusy(); }
+    }
+  });
+}
+
+// ---- 商品マスター: 全商品を一括削除 --------------------------
+async function deleteAllItems(brand) {
+  const u = State.user;
+  if (!u || (u.role !== 'admin' && u.role !== 'super_admin')) { toast('権限がありません', 'error'); return; }
+  const count = (State.items[brand] || []).length;
+  if (count === 0) { toast('この業態に登録済みの商品はありません', 'error'); return; }
+  openModal({
+    title: `${brandLabel(brand)} 全商品を削除`,
+    body: `
+      <div class="stack">
+        <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px 14px;color:#b91c1c;font-weight:700;">
+          ⚠ ${brandLabel(brand)} の商品マスター <u>${count}件すべて</u> を削除します。
+        </div>
+        <div class="help">・二重取込みなどで増えてしまった商品を一度リセットしたい場合に使います。<br>
+        ・削除後は「⬇テンプレートDL」→ Excel編集 →「📤Excel取込み」で登録し直せます。<br>
+        ・<strong>この操作は元に戻せません。</strong>削除を実行するには下の欄に「削除」と入力してください。</div>
+        <input class="input" id="delete-all-confirm-word" placeholder="削除 と入力">
+      </div>`,
+    confirmLabel: '全件削除を実行',
+    onConfirm: async () => {
+      const w = (document.getElementById('delete-all-confirm-word') || {}).value || '';
+      if (w.trim() !== '削除') { toast('「削除」と入力してください', 'error'); return false; }
+      showBusy(`${brandLabel(brand)} の商品${count}件を削除中…`);
+      try {
+        const { error } = await sb.from('items').delete().eq('brand', brand);
+        if (error) { toast('削除に失敗：' + (error.message || '通信エラー'), 'error'); return false; }
+        State.items[brand] = [];
+        render();
+        toast(`${brandLabel(brand)} の商品${count}件を削除しました`, 'success');
+        return true;
+      } finally { hideBusy(); }
     }
   });
 }
@@ -8136,12 +8206,35 @@ function openModal({ title, body, onConfirm, confirmLabel }) {
     const action = e.target.dataset?.modalAction;
     if (action === 'cancel') back.remove();
     if (action === 'confirm') {
-      const ok = await onConfirm();
+      const btn = e.target;
+      if (btn.disabled) return; // 二重クリック防止
+      btn.disabled = true;
+      const orig = btn.textContent;
+      btn.textContent = '処理中…';
+      let ok;
+      try { ok = await onConfirm(); }
+      finally { btn.disabled = false; btn.textContent = orig; }
       if (ok !== false) back.remove();
     }
   });
   document.body.appendChild(back);
 }
+
+// 処理中オーバーレイ（進捗表示つき・二重操作防止）
+function showBusy(msg) {
+  let el = document.getElementById('busy-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'busy-overlay';
+    el.innerHTML = '<div class="busy-box"><div class="busy-spin"></div><span id="busy-msg"></span></div>';
+    document.body.appendChild(el);
+  }
+  el.style.display = 'flex';
+  const m = document.getElementById('busy-msg');
+  if (m) m.textContent = msg;
+}
+function updateBusy(msg) { const m = document.getElementById('busy-msg'); if (m) m.textContent = msg; }
+function hideBusy() { const el = document.getElementById('busy-overlay'); if (el) el.style.display = 'none'; }
 
 function toast(msg, type = '') {
   const el = document.createElement('div');
