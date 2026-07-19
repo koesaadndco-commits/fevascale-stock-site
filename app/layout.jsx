@@ -14,6 +14,14 @@ const ADAPTER_JS = fs.readFileSync(
 
 export const metadata = {
   title: '棚卸管理プロダクト「FEVASCALE STOCK」',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/assets/favicon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/assets/app-icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: '/assets/apple-touch-icon.png',
+  },
   appleWebApp: {
     capable: true,
     title: 'FEVASCALE STOCK',
