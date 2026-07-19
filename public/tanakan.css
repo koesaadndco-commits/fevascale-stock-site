@@ -1581,3 +1581,9 @@
 #busy-overlay .busy-box { background: #fff; border-radius: 14px; padding: 20px 28px; font-weight: 700; font-size: 15px; color: #1e293b; box-shadow: 0 10px 40px rgba(0,0,0,.35); display: flex; align-items: center; gap: 14px; max-width: 90vw; }
 #busy-overlay .busy-spin { width: 26px; height: 26px; border: 3.5px solid #e2e8f0; border-top-color: #0f766e; border-radius: 50%; animation: busyspin .8s linear infinite; flex: none; }
 @keyframes busyspin { to { transform: rotate(360deg); } }
+
+/* ヒョンチャンプルコギのブランドカラー（トップバー等） */
+.topbar.brand-hyonchan { border-bottom-color: #b45309; box-shadow: 0 1px 0 #b45309; }
+.brand-hyonchan-color { color: #b45309; }
+.btn-brand-hyonchan { background: #b45309; color: #fff; }
+.btn-brand-hyonchan:hover { background: #92400e; }

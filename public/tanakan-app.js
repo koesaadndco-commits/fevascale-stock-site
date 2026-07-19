@@ -6358,12 +6358,10 @@ function openItemDialog(brand, itemId) {
     ? State.supplierNotes[initialSupplier]
     : { person: '', contact: '', memo: '' };
 
-  const brandLabel = brand === 'hachiban' ? '8番らーめん'
-                   : brand === 'komeda' ? 'コメダ珈琲店'
-                   : brand === 'hyonchan' ? 'ヒョンチャンプルコギ' : '';
+  const brandLabelStr = (function(){ const b = (State.brands || []).find(x => x.id === brand); return b ? b.name : brand; })();
 
   openModal({
-    title: isEdit ? `${brandLabel} 商品を編集` : `${brandLabel} 商品を追加`,
+    title: isEdit ? `${brandLabelStr} 商品を編集` : `${brandLabelStr} 商品を追加`,
     body: `
       <div class="stack">
         <div>
