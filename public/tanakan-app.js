@@ -1699,7 +1699,7 @@ function renderTopbar() {
 // アプリのバージョン番号（バージョンアップのたびにここだけ更新すればログイン画面に反映されます）
 const LOGO_KOESA_IMG = '/assets/logo-koesa.png';
 const LOGO_WORDMARK_IMG = '/assets/logo-wordmark.png';
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 function renderLogin() {
   return `
   <div class="lx-wrap">
