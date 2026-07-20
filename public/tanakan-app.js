@@ -1791,10 +1791,14 @@ function canReceiveSlip(slip) {
   return false;
 }
 function canHqApprove() { const r = State.user?.role; return r === 'soumu' || r === 'admin'; }
+function isSlipCreator(slip) {
+  const u = State.user; if (!u) return false;
+  return !!slip.createdBy && slip.createdBy === u.name;
+}
 function visibleSlips() {
   const r = State.user?.role;
   if (r === 'admin' || r === 'soumu') return State.transferSlips;
-  return State.transferSlips.filter(s => canCreateSlipFrom(s.fromStore) || canReceiveSlip(s));
+  return State.transferSlips.filter(s => canCreateSlipFrom(s.fromStore) || canReceiveSlip(s) || isSlipCreator(s));
 }
 function slipTotal(s) { return (s.lines || []).reduce((a, b) => a + (parseFloat(b.amount) || 0), 0); }
 // 明細の数量表示（無ければ空）。単価があれば「×N（¥単価）」で内訳を示す。
@@ -3089,7 +3093,7 @@ function renderTransfers() {
   const period = State.slipPeriod || currentSlipPeriod();
   const slips = visibleSlips();
   const u = State.user;
-  const canCreate = u && (u.role === 'admin' || u.role === 'manager' || (u.role === 'staff' && u.defaultStore));
+  const canCreate = u && (u.role === 'admin' || u.role === 'manager' || u.role === 'staff' || u.role === 'soumu');
   const statusLabel = (st) => st === 'approved' ? '<span class="badge done">本社承認済</span>'
     : st === 'received' ? '<span class="badge pending">受取済（本社承認待）</span>'
     : st === 'sent' ? '<span class="badge empty">受取待ち</span>' : '<span class="badge empty">下書き</span>';
@@ -3098,7 +3102,7 @@ function renderTransfers() {
     const canRecv = s.status === 'sent' && canReceiveSlip(s);
     const canApp = s.status === 'received' && canHqApprove();
     const isMgrUp = ['manager', 'admin', 'super_admin'].includes(State.user?.role);
-    const canDel = isMgrUp || (s.status === 'sent' && canCreateSlipFrom(s.fromStore));
+    const canDel = isMgrUp || (s.status === 'sent' && (canCreateSlipFrom(s.fromStore) || isSlipCreator(s)));
     return `<div class="slip-card">
       <div class="slip-card-head">
         <span class="slip-route">${escapeHtml(slipStoreName(s.fromStore))} <span class="arr">→</span> ${escapeHtml(slipStoreName(s.toStore))}</span>
@@ -3198,10 +3202,14 @@ window.slipReloadItems = function(){
 function openCreateSlipModal() {
   const u = State.user;
   let fromStores;
-  if (u.role === 'admin') fromStores = State.stores;
+  if (u.role === 'admin' || u.role === 'soumu') fromStores = State.stores;
   else if (u.role === 'manager') fromStores = State.stores.filter(s => u.approveBrand === 'all' || s.brand === u.approveBrand);
-  else fromStores = State.stores.filter(s => s.id === u.defaultStore);
-  if (fromStores.length === 0) { toast('発行できる自店がありません', 'error'); return; }
+  else {
+    // スタッフ: 担当店舗があればそれを既定に、未設定なら全店から選択可
+    fromStores = State.stores.filter(s => s.id === u.defaultStore);
+    if (fromStores.length === 0) fromStores = State.stores;
+  }
+  if (fromStores.length === 0) { toast('発行できる店舗がありません', 'error'); return; }
   const now = new Date();
   const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -3319,7 +3327,7 @@ async function deleteSlip(id) {
   const isMgrUp = ['manager', 'admin', 'super_admin'].includes(State.user?.role);
   // 業態責任者以上はどの状態の伝票も削除可。それ以外は発行店舗が「受取待ち」の間のみ
   if (!isMgrUp) {
-    if (!canCreateSlipFrom(s.fromStore)) { toast('権限がありません', 'error'); return; }
+    if (!canCreateSlipFrom(s.fromStore) && !isSlipCreator(s)) { toast('権限がありません', 'error'); return; }
     if (s.status !== 'sent') { toast('受取・承認済の伝票の削除は業態責任者以上のみ可能です', 'error'); return; }
   }
   const warn = s.status !== 'sent' ? '\n※ 受取・承認済の伝票です。削除すると集計からも除外されます。' : '';
