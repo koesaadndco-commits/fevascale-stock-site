@@ -1775,7 +1775,14 @@ function currentSlipPeriod() {
   if (d.getDate() >= 21) { m += 1; if (m > 11) { m = 0; y += 1; } } // 20日締め・21日〜翌月度
   return `${y}-${String(m + 1).padStart(2, '0')}`;
 }
-function slipStoreName(id) { const s = State.stores.find(x => x.id === id); return s ? s.name : id; }
+function slipStoreName(id) {
+  const s = State.stores.find(x => x.id === id);
+  if (!s) return id;
+  const bl = brandLabel(s.brand);
+  // 店舗名にブランド名が含まれていなければ先頭に付けて区別しやすくする
+  if (bl && s.name && !s.name.includes(bl)) return `${bl} ${s.name}`;
+  return s.name;
+}
 function canCreateSlipFrom(storeId) {
   const u = State.user; if (!u) return false;
   if (u.role === 'admin') return true;
@@ -3238,8 +3245,20 @@ function openCreateSlipModal() {
       <input class="input num" id="slip-line-qty-${i}" type="number" min="0" step="0.01" placeholder="数量" oninput="slipRecalc(${i})">
       <input class="input num" id="slip-line-amt-${i}" type="number" min="0" placeholder="金額">
     </div>`).join('');
-  const fromOpts = fromStores.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
-  const toOpts = State.stores.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+  // 店舗名の重複対策：常に先頭に【ブランド名】を付ける（名前にブランド名が既にある場合は取り除いてから付け直す）
+  const slipStoreOptLabel = (s) => {
+    const bl = brandLabel(s.brand);
+    let nm = s.name || '';
+    if (bl && nm.startsWith(bl)) nm = nm.slice(bl.length).replace(/^[\s　]+/, '');
+    return `【${bl}】${nm || s.name}`;
+  };
+  const brandSort = (a, b) => {
+    const oa = (State.brands.find(x => x.id === a.brand)?.sortOrder ?? 999);
+    const ob = (State.brands.find(x => x.id === b.brand)?.sortOrder ?? 999);
+    return oa - ob || (a.name || '').localeCompare(b.name || '', 'ja');
+  };
+  const fromOpts = fromStores.slice().sort(brandSort).map(s => `<option value="${s.id}">${escapeHtml(slipStoreOptLabel(s))}</option>`).join('');
+  const toOpts = State.stores.slice().sort(brandSort).map(s => `<option value="${s.id}">${escapeHtml(slipStoreOptLabel(s))}</option>`).join('');
   openModal({
     title: '売買伝票を作成（販売側）',
     confirmLabel: '発行する',
