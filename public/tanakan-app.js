@@ -1928,7 +1928,11 @@ function flAllowedStores(){
   const u = State.user; if(!u) return [];
   if(u.role === 'admin' || u.role === 'soumu') return all;
   if(u.role === 'manager') return all.filter(s => u.approveBrand === 'all' || u.approveBrand === storeBrandOf(s.id));
-  if(u.role === 'staff') return all.filter(s => s.id === u.defaultStore);
+  if(u.role === 'staff'){
+    // 担当店舗が設定されていればその店のみ、未設定なら全店から選択可（選択肢が空にならないように）
+    const own = all.filter(s => s.id === u.defaultStore);
+    return own.length ? own : all;
+  }
   return all;
 }
 function flCanAdminConfig(){ const r = State.user?.role; return r === 'admin' || r === 'soumu'; }
@@ -1937,6 +1941,13 @@ function flVisibleRows(){
   return (State.foodLoss||[]).filter(r => allowed.has(r.storeId));
 }
 function flStoreName(id){ const s=(State.stores||[]).find(x=>x.id===id); return s?s.name:id; }
+// 店舗名にブランドを付けて重複を区別（例：【8番らーめん】鯖江店）。名前に既にブランド名があれば付け直さない
+function storeLabelWithBrand(s){
+  if(!s) return '';
+  const bl = brandLabel(s.brand); let nm = s.name || '';
+  if(bl && nm.startsWith(bl)) nm = nm.slice(bl.length).replace(/^[\s　]+/, '');
+  return bl ? `【${bl}】${nm || s.name}` : (s.name || '');
+}
 
 // ---- Supabase 保存層（sb 直接） ----
 async function flFetch(period){
@@ -2143,7 +2154,7 @@ function renderFoodLossFormInner(){
     <div class="fl-grid">
       <div class="fl-field">
         <label>店舗</label>
-        <select onchange="flField('storeId', this.value)">${flOptions(stores, d.storeId, s=>s.id, s=>s.name)}</select>
+        <select onchange="flField('storeId', this.value)">${flOptions(stores, d.storeId, s=>s.id, s=>storeLabelWithBrand(s))}</select>
       </div>
       <div class="fl-field">
         <label>区分</label>
@@ -2641,7 +2652,7 @@ function renderBreakageFormInner(){
   return `
   <div class="fl-grid">
     <div class="fl-field"><label>店舗</label>
-      <select onchange="kbField('storeId', this.value)">${opt(stores, d.storeId, s=>s.id, s=>s.name)}</select></div>
+      <select onchange="kbField('storeId', this.value)">${opt(stores, d.storeId, s=>s.id, s=>storeLabelWithBrand(s))}</select></div>
     <div class="fl-field"><label>区分</label>
       <select onchange="kbField('category', this.value)"><option value="">選択…</option>${opt(FL_CATEGORIES.map(c=>({c})), d.category, x=>x.c, x=>x.c)}</select></div>
     <div class="fl-field"><label>氏名</label>
