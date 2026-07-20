@@ -3233,8 +3233,34 @@ window.slipReloadItems = function(){
     if (amtEl) { amtEl.dataset.unitPrice = ''; amtEl.readOnly = false; amtEl.classList.remove('locked'); amtEl.value = ''; }
   }
 };
+// 伝票の下書き自動保存（端末ローカルに保存。誤って閉じても再開できる）
+function slipDraftKey(){ return 'slipDraft_' + (State.user?.id || 'anon'); }
+function slipSaveDraft(){
+  try {
+    const g = id => (document.getElementById(id) || {}).value;
+    const lines = [];
+    for (let i = 0; i < 5; i++) {
+      const pick = document.getElementById('slip-line-pick-' + i);
+      lines.push({
+        pick: pick ? pick.value : '',
+        name: g('slip-line-name-' + i) || '',
+        qty: g('slip-line-qty-' + i) || '',
+        amt: g('slip-line-amt-' + i) || '',
+      });
+    }
+    const draft = { from: g('slip-from'), to: g('slip-to'), date: g('slip-date'), time: g('slip-time'),
+      sellerName: g('slip-seller-name'), lines, savedAt: Date.now() };
+    // 中身が空なら保存しない
+    const hasContent = lines.some(l => l.name || l.qty || l.amt || (l.pick && l.pick !== ''));
+    if (hasContent) localStorage.setItem(slipDraftKey(), JSON.stringify(draft));
+  } catch(_){}
+}
+function slipLoadDraft(){ try { const s = localStorage.getItem(slipDraftKey()); return s ? JSON.parse(s) : null; } catch(_){ return null; } }
+function slipClearDraft(){ try { localStorage.removeItem(slipDraftKey()); } catch(_){} }
+
 function openCreateSlipModal() {
   const u = State.user;
+  const _draft = slipLoadDraft();
   let fromStores;
   if (u.role === 'admin' || u.role === 'soumu') fromStores = State.stores;
   else if (u.role === 'manager') fromStores = State.stores.filter(s => u.approveBrand === 'all' || s.brand === u.approveBrand);
@@ -3270,20 +3296,29 @@ function openCreateSlipModal() {
   };
   const fromOpts = fromStores.slice().sort(brandSort).map(s => `<option value="${s.id}">${escapeHtml(slipStoreOptLabel(s))}</option>`).join('');
   const toOpts = State.stores.slice().sort(brandSort).map(s => `<option value="${s.id}">${escapeHtml(slipStoreOptLabel(s))}</option>`).join('');
+  const draftName = (_draft && _draft.sellerName != null) ? _draft.sellerName : (u.name || '');
   openModal({
     title: '売買伝票を作成（販売側）',
     confirmLabel: '発行する',
+    dismissible: false,
+    onCancel: async () => {
+      slipSaveDraft();
+      if (!confirm('入力内容を下書きとして保存して閉じますか？\n（「キャンセル」を押すと編集に戻ります）')) return false;
+      toast('下書きを保存しました。次回開いたときに続きから入力できます', 'info');
+      return true;
+    },
     body: `
       <div class="stack">
+        ${_draft ? `<div class="slip-draft-note" style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:8px 10px;font-size:12px;color:#1d4ed8;display:flex;justify-content:space-between;align-items:center;gap:8px;">📝 前回の下書きを復元しました<button type="button" class="btn btn-secondary btn-sm" onclick="slipClearDraft();document.querySelectorAll('.modal-backdrop').forEach(e=>e._closeModal&&e._closeModal());openCreateSlipModal();">下書きを破棄</button></div>` : ''}
         <div class="row">
-          <div class="grow"><label class="field">日付</label><input class="input" id="slip-date" type="date" value="${dateStr}"></div>
-          <div class="grow"><label class="field">時間</label><input class="input" id="slip-time" type="time" value="${timeStr}"></div>
+          <div class="grow"><label class="field">日付</label><input class="input" id="slip-date" type="date" value="${(_draft && _draft.date) || dateStr}"></div>
+          <div class="grow"><label class="field">時間</label><input class="input" id="slip-time" type="time" value="${(_draft && _draft.time) || timeStr}"></div>
         </div>
         <div><label class="field">販売店舗（自店）</label><select class="select" id="slip-from" onchange="slipReloadItems()">${fromOpts}</select></div>
         <div><label class="field">購入店舗</label><select class="select" id="slip-to">${toOpts}</select></div>
         <label class="field">明細（最大5件／商品リストから選択 または 手入力）</label>
         ${lineRows}
-        <div><label class="field">対応者氏名</label><input class="input" id="slip-seller-name" value="${escapeHtml(u.name || '')}"></div>
+        <div><label class="field">対応者氏名</label><input class="input" id="slip-seller-name" value="${escapeHtml(draftName)}"></div>
         <label class="field">認印（対応者氏名から自動生成）</label>
         <div class="sign-seal-wrap" style="display:flex;align-items:center;gap:12px;padding:8px 0;">
           <div id="slip-seller-seal" class="sign-seal">${sealHtml(u.name || '', 72)}</div>
@@ -3320,10 +3355,31 @@ function openCreateSlipModal() {
       };
       const ok = await storage.saveTransferSlip(slip);
       if (ok === false) { toast('保存に失敗：' + (_lastDbError || ''), 'error'); return false; }
+      slipClearDraft();
       await loadTransfers(); toast('伝票を発行しました', 'success'); render(); return true;
     }
   });
-  setTimeout(() => { const nm = document.getElementById('slip-seller-name'); const sl = document.getElementById('slip-seller-seal'); if (nm && sl) nm.addEventListener('input', () => { sl.innerHTML = sealHtml(nm.value.trim(), 72); }); }, 30);
+  setTimeout(() => {
+    const nm = document.getElementById('slip-seller-name');
+    const sl = document.getElementById('slip-seller-seal');
+    if (nm && sl) nm.addEventListener('input', () => { sl.innerHTML = sealHtml(nm.value.trim(), 72); });
+    // 下書きの復元：店舗・明細をプリフィル
+    if (_draft) {
+      const setV = (id, v) => { const el = document.getElementById(id); if (el && v != null && v !== '') el.value = v; };
+      setV('slip-from', _draft.from); setV('slip-to', _draft.to);
+      if (_draft.from) slipReloadItems();
+      (_draft.lines || []).forEach((l, i) => {
+        const pick = document.getElementById('slip-line-pick-' + i);
+        if (pick && l.pick) { pick.value = l.pick; slipPickItem(pick, i); }
+        setV('slip-line-name-' + i, l.name);
+        setV('slip-line-qty-' + i, l.qty);
+        setV('slip-line-amt-' + i, l.amt);
+      });
+    }
+    // 入力のたびに下書き自動保存
+    const modal = document.querySelector('.modal-backdrop .modal');
+    if (modal) modal.addEventListener('input', () => slipSaveDraft());
+  }, 30);
 }
 
 function openReceiveSlipModal(id) {
@@ -8250,7 +8306,7 @@ function csvCell(v) {
 // =========================================================
 // Modal / Toast
 // =========================================================
-function openModal({ title, body, onConfirm, confirmLabel }) {
+function openModal({ title, body, onConfirm, confirmLabel, dismissible = true, onCancel }) {
   const back = document.createElement('div');
   back.className = 'modal-backdrop';
   back.innerHTML = `
@@ -8262,10 +8318,17 @@ function openModal({ title, body, onConfirm, confirmLabel }) {
         <button class="btn btn-primary" data-modal-action="confirm">${escapeHtml(confirmLabel || '追加')}</button>
       </div>
     </div>`;
+  const closeModal = () => back.remove();
+  back._closeModal = closeModal;
   back.addEventListener('click', async (e) => {
-    if (e.target === back) back.remove();
+    // 背景クリック：dismissible=false のときは閉じない（誤操作で入力を失わないため）
+    if (e.target === back) { if (dismissible) closeModal(); return; }
     const action = e.target.dataset?.modalAction;
-    if (action === 'cancel') back.remove();
+    if (action === 'cancel') {
+      if (onCancel) { const keep = await onCancel(); if (keep === false) return; }
+      closeModal();
+      return;
+    }
     if (action === 'confirm') {
       const btn = e.target;
       if (btn.disabled) return; // 二重クリック防止
