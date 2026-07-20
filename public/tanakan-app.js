@@ -2064,28 +2064,54 @@ window.flVoice = function(){
 };
 
 // 発話テキスト → 各欄へ簡易振り分け（無料・ルールベース。AI接続時は別途差し替え）
-function flParseVoice(text){
-  const d = State.foodLossDraft;
-  let rest = ' ' + text + ' ';
-  // 1) 品目マスタ最長一致
-  const items = flItemsForStore(d.storeId).slice().sort((a,b)=>(b.name||'').length-(a.name||'').length);
+// 「商品名 → 数量 → 理由」の語順を前提に、数量・金額の位置で前後を分けて振り分ける
+function parseVoiceToDraft(d, text, itemsForStore, unitPattern, recalc){
+  const items = (itemsForStore || []).slice().sort((a,b)=>(b.name||'').length-(a.name||'').length);
   let matched = null;
   for(const it of items){ if(it.name && text.includes(it.name)){ matched = it; break; } }
-  if(matched){ d.itemId=matched.id; d.itemName=matched.name; d.unit=matched.unit||'個'; d._price=Number(matched.price)||0; rest = rest.replace(matched.name,' '); }
-  // 2) 金額（◯円）
-  const am = text.match(/([0-9０-９,，]+)\s*円/);
-  if(am){ d.amountExcl = parseInt(am[1].replace(/[^0-9]/g,''),10)||d.amountExcl; d._amountTouched=true; rest = rest.replace(am[0],' '); }
-  // 3) 数量（数字＋単位）
-  const q = rest.match(/([0-9０-９]+(?:[\.．][0-9０-９]+)?)\s*(個|本|枚\u679a?|袋|箱|杯|皿|玉|尾|匹|パック|g|ｇ|kg|ｋｇ|ml|L|ℓ|リットル|ケース|束)?/);
-  if(q){ const zen='０１２３４５６７８９'; let n=q[1].replace(/[０-９]/g,c=>zen.indexOf(c)); d.qty=n; if(q[2]) d.unit=q[2]; rest = rest.replace(q[0],' '); flRecalcAmount(); }
-  // 4) 残りを理由に（商品名が取れていない場合は商品名に寄せる）
-  rest = rest.replace(/\s+/g,' ').trim();
-  if(!matched && rest){ d.itemName = rest; }
-  else if(rest){ d.reason = (d.reason ? d.reason+' ' : '') + rest; }
+  if(matched){ d.itemId=matched.id; d.itemName=matched.name; d.unit=matched.unit||'個'; d._price=Number(matched.price)||0; }
+  const qtyRe = new RegExp('([0-9０-９]+(?:[\\.．][0-9０-９]+)?)\\s*('+unitPattern+')?');
+  const amtRe = /([0-9０-９,，]+)\s*円/;
+  // 金額（◯円）
+  let amtIdx = -1, amtLen = 0;
+  const am = text.match(amtRe);
+  if(am){ d.amountExcl = parseInt(am[1].replace(/[^0-9]/g,''),10)||d.amountExcl; d._amountTouched=true; amtIdx = am.index; amtLen = am[0].length; }
+  // 数量（金額の「◯円」やマスタ名の数字を誤検出しないよう伏せてから探す）
+  let masked = text;
+  if(amtIdx >= 0){ masked = text.slice(0, amtIdx) + ' '.repeat(amtLen) + text.slice(amtIdx + amtLen); }
+  if(matched){ const mi = masked.indexOf(matched.name); if(mi >= 0){ masked = masked.slice(0, mi) + ' '.repeat(matched.name.length) + masked.slice(mi + matched.name.length); } }
+  let qtyIdx = -1, qtyLen = 0;
+  const q = masked.match(qtyRe);
+  if(q && q[1]){ const zen='０１２３４５６７８９'; let n=q[1].replace(/[０-９]/g,c=>zen.indexOf(c)); d.qty=n; if(q[2]) d.unit=q[2]; qtyIdx = q.index; qtyLen = q[0].length; if(recalc) recalc(); }
+  // 位置ベースで前後を分割：区切り＝数量と金額の最も手前
+  const splitPts = [qtyIdx, amtIdx].filter(i => i >= 0);
+  const splitAt = splitPts.length ? Math.min(...splitPts) : -1;
+  // 商品名・理由からは数字と金額だけ除去（単位文字は「取り皿」「お皿」などを壊さないよう残す）
+  const clean = s => (s || '').replace(amtRe,' ').replace(/[0-9０-９,，]/g,' ').replace(/\s+/g,' ').trim();
+  if(splitAt >= 0){
+    const head = clean(text.slice(0, splitAt));
+    const qtyEnd = Math.max(qtyIdx>=0?qtyIdx+qtyLen:0, amtIdx>=0?amtIdx+amtLen:0);
+    let tail = text.slice(qtyEnd);
+    if(matched) tail = tail.replace(matched.name,' ');
+    tail = clean(tail);
+    if(!matched && head) d.itemName = head;
+    if(tail) d.reason = (d.reason ? d.reason+' ' : '') + tail;
+  } else {
+    let r = text; if(matched) r = r.replace(matched.name,' ');
+    r = clean(r);
+    if(!matched && r) d.itemName = r;
+    else if(r) d.reason = (d.reason ? d.reason+' ' : '') + r;
+  }
   toast('「'+text+'」を取り込みました（内容をご確認ください）','success');
-  renderFoodLossInline();
 }
 
+function flParseVoice(text){
+  const d = State.foodLossDraft;
+  parseVoiceToDraft(d, text, flItemsForStore(d.storeId),
+    '個|本|枚|袋|箱|杯|皿|玉|尾|匹|パック|g|ｇ|kg|ｋｇ|ml|L|ℓ|リットル|ケース|束',
+    flRecalcAmount);
+  renderFoodLossInline();
+}
 // ---- AI設定（admin/soumu のみ） ----
 window.flAiToggle = function(el){ State.aiConfig.flEnabled = !!el.checked; };
 window.flAiUrl = function(el){ State.aiConfig.flUrl = el.value; };
@@ -2590,19 +2616,9 @@ window.kbVoice = function(){
 };
 function kbParseVoice(text){
   const d = State.breakageDraft;
-  let rest = ' ' + text + ' ';
-  const items = kbItemsForStore(d.storeId).slice().sort((a,b)=>(b.name||'').length-(a.name||'').length);
-  let matched=null;
-  for(const it of items){ if(it.name && text.includes(it.name)){ matched=it; break; } }
-  if(matched){ d.itemId=matched.id; d.itemName=matched.name; d.unit=matched.unit||'個'; d._price=Number(matched.price)||0; rest=rest.replace(matched.name,' '); }
-  const am = text.match(/([0-9０-９,，]+)\s*円/);
-  if(am){ d.amountExcl=parseInt(am[1].replace(/[^0-9]/g,''),10)||d.amountExcl; d._amountTouched=true; rest=rest.replace(am[0],' '); }
-  const q = rest.match(/([0-9０-９]+(?:[\.．][0-9０-９]+)?)\s*(個|本|枚|袋|箱|杯|皿|玉|脚|客|セット|パック|g|ｇ|kg|ml|L)?/);
-  if(q){ const zen='０１２３４５６７８９'; let n=q[1].replace(/[０-９]/g,c=>zen.indexOf(c)); d.qty=n; if(q[2]) d.unit=q[2]; rest=rest.replace(q[0],' '); kbRecalc(); }
-  rest = rest.replace(/\s+/g,' ').trim();
-  if(!matched && rest){ d.itemName = rest; }
-  else if(rest){ d.reason = (d.reason ? d.reason+' ' : '') + rest; }
-  toast('「'+text+'」を取り込みました（内容をご確認ください）','success');
+  parseVoiceToDraft(d, text, kbItemsForStore(d.storeId),
+    '個|本|枚|袋|箱|杯|皿|玉|脚|客|セット|パック|g|ｇ|kg|ml|L',
+    kbRecalc);
   renderBreakageInline();
 }
 
