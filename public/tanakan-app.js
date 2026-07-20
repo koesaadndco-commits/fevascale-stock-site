@@ -3457,11 +3457,12 @@ function slipPrintBox(s) {
 function buildSlipsPrintHTML() {
   const slips = visibleSlips();
   if (slips.length === 0) return `<div class="p-header"><h1>店舗間 売買伝票</h1></div><div style="padding:12pt;">当月度の伝票はありません。</div>`;
-  let html = '';
-  for (let i = 0; i < slips.length; i += 6) {
-    html += `<div class="slips-print-page">${slips.slice(i, i + 6).map(slipPrintBox).join('')}</div>`;
-  }
-  return html;
+  // 明細の多い伝票でも見切れないよう、固定6分割ではなく内容に合わせて自動レイアウト。
+  // 明細が多い伝票（6行超）は横1列（幅いっぱい）で大きく、少ない伝票は2列で省スペースに。
+  return `<div class="slips-print-flow">${slips.map(s => {
+    const many = (s.lines || []).length > 6;
+    return `<div class="slip-print-cell${many ? ' wide' : ''}">${slipPrintBox(s)}</div>`;
+  }).join('')}</div>`;
 }
 function printSlips() {
   const area = document.getElementById('print-area');

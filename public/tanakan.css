@@ -1493,9 +1493,11 @@
   .slip-exchange-btn .chev { font-size: 24px; color: #2563eb; font-weight: 700; }
   @media (max-width: 480px) { .slip-exchange-btn .lbl { font-size: 13px; } .slip-exchange-btn .lbl b { font-size: 16px; } .slip-exchange-btn img { height: 44px; } }
   @media print {
-    .slips-print-page { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; gap: 4mm; height: 277mm; page-break-after: always; }
-    .slips-print-page:last-child { page-break-after: auto; }
-    .slip-print-box { position: relative; border: 1pt solid #000; border-radius: 4pt; padding: 5pt 7pt; display: flex; flex-direction: column; overflow: hidden;
+    /* 内容の長さに合わせて自動レイアウト（明細が多い伝票も見切れない） */
+    .slips-print-flow { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; align-content: start; }
+    .slip-print-cell { break-inside: avoid; page-break-inside: avoid; min-height: 88mm; }
+    .slip-print-cell.wide { grid-column: 1 / -1; }  /* 明細が多い伝票は横幅いっぱいで大きく */
+    .slip-print-box { position: relative; border: 1pt solid #000; border-radius: 4pt; padding: 5pt 7pt; display: flex; flex-direction: column; height: 100%; overflow: visible;
       background-image: url('/assets/bg-2.png'); background-repeat: no-repeat; background-position: center 58%; background-size: 72% auto;
       -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .slip-print-box > * { position: relative; }
