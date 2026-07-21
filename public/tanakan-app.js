@@ -1700,6 +1700,19 @@ function canAccessAdmin() {
 function notifSeenKey(){ return 'notifSeen_' + (State.user?.id || 'anon'); }
 function notifLastSeen(){ const v = Number(localStorage.getItem(notifSeenKey()) || 0); return isNaN(v) ? 0 : v; }
 function notifMarkAllSeen(){ try { localStorage.setItem(notifSeenKey(), String(Date.now())); } catch(_){} }
+// ---- ダッシュボード各メニューの「新着」既読管理（当月度の件数を開いた時点で既読にする） ----
+function secSeenKey(section){ return 'secSeen_' + section + '_' + (State.user?.id || 'anon'); }
+function secSeenCount(section, period){
+  try{ const o = JSON.parse(localStorage.getItem(secSeenKey(section)) || 'null'); if(o && o.period === period) return Number(o.count) || 0; }catch(_){}
+  return 0; // この月度をまだ開いていない＝全件が新着
+}
+function markSectionSeen(section){
+  const period = currentSlipPeriod();
+  const raw = (State._badgeRaw && State._badgeRaw[section]) || 0;
+  try{ localStorage.setItem(secSeenKey(section), JSON.stringify({ period, count: raw })); }catch(_){}
+  const idMap = { transfers:'badge-transfers', foodloss:'badge-foodloss', breakage:'badge-breakage' };
+  setBadge(idMap[section], 0); // 開いた瞬間にバッジを消す
+}
 function buildNotifications(){
   const list = [];
   const u = State.user;
@@ -3084,8 +3097,12 @@ async function refreshBadges(){
   const period = currentSlipPeriod();
   const cnt = async (tbl,col,val)=>{ try{ const { count } = await sb.from(tbl).select('id',{count:'exact',head:true}).eq(col,val); return count||0; }catch(_){ return 0; } };
   const [t,f,k] = await Promise.all([ cnt('transfer_slips','month',period), cnt('food_loss','period',period), cnt('breakage','period',period) ]);
-  State.badgeCounts = { transfers:t, foodloss:f, breakage:k };
-  setBadge('badge-transfers',t); setBadge('badge-foodloss',f); setBadge('badge-breakage',k);
+  State._badgeRaw = { transfers:t, foodloss:f, breakage:k }; // 実件数（既読判定の基準）
+  // 表示は「未読（新着）＝実件数 − 既読件数」。開いた月度の件数を既読として差し引く。
+  const disp = (section, raw) => Math.max(0, raw - secSeenCount(section, period));
+  const dt = disp('transfers', t), df = disp('foodloss', f), dk = disp('breakage', k);
+  State.badgeCounts = { transfers:dt, foodloss:df, breakage:dk };
+  setBadge('badge-transfers',dt); setBadge('badge-foodloss',df); setBadge('badge-breakage',dk);
 }
 
 // =========================================================
@@ -6001,9 +6018,9 @@ async function handleAction(e) {
     case 'release-approval-deadline': await releaseApprovalDeadline(); break;
     case 'confirm-soumu': await confirmSoumu(); break;
     case 'revoke-soumu': await revokeSoumu(); break;
-    case 'goto-transfers': await loadTransfers(State.month || currentSlipPeriod()); navigate('transfers'); break;
-    case 'goto-foodloss': if(!getFeatureFlags().foodloss){ toast('食材ロス管理は現在OFFです（KOESAコンソールで有効化）','error'); break; } await loadFoodLoss(); navigate('foodloss'); break;
-    case 'goto-breakage': if(!getFeatureFlags().breakage){ toast('器物破損管理は現在OFFです（KOESAコンソールで有効化）','error'); break; } await loadBreakage(); navigate('breakage'); break;
+    case 'goto-transfers': markSectionSeen('transfers'); await loadTransfers(State.month || currentSlipPeriod()); navigate('transfers'); break;
+    case 'goto-foodloss': if(!getFeatureFlags().foodloss){ toast('食材ロス管理は現在OFFです（KOESAコンソールで有効化）','error'); break; } markSectionSeen('foodloss'); await loadFoodLoss(); navigate('foodloss'); break;
+    case 'goto-breakage': if(!getFeatureFlags().breakage){ toast('器物破損管理は現在OFFです（KOESAコンソールで有効化）','error'); break; } markSectionSeen('breakage'); await loadBreakage(); navigate('breakage'); break;
     case 'goto-coins': await loadCoins(); navigate('coins'); break;
     case 'coin-confirm': await coinConfirmMonth(); break;
     case 'coin-save-config': await coinSaveConfig(); break;
