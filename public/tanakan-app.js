@@ -3836,10 +3836,19 @@ function canEditStoreComment(storeId) {
   if (u.role === 'staff' && u.defaultStore === storeId) return true;
   return false;
 }
+// 自店の店長・リーダー（役職に「店長」「リーダー」「係長」「副店長」「SV」を含むスタッフ）
+function isStoreLeader(storeId) {
+  const u = State.user; if (!u) return false;
+  if (u.role !== 'staff' || u.defaultStore !== storeId) return false;
+  const pos = u.position || '';
+  return ['店長', 'リーダー', '係長', '副店長', 'SV'].some(k => pos.includes(k));
+}
 function canEditManagerComment(storeId) {
   const u = State.user; if (!u) return false;
   if (u.role === 'admin') return true;
   if (u.role === 'manager' && (u.approveBrand === 'all' || u.approveBrand === storeBrandOf(storeId))) return true;
+  // 自店の店長・リーダーも改善策（改善報告）を入力できる
+  if (isStoreLeader(storeId)) return true;
   return false;
 }
 function getStoreAlertData(storeId) {
@@ -3905,9 +3914,9 @@ function renderAlertSection(stores) {
         <input class="input alert-comment-name" data-alert-store="${r.store.id}" data-alert-field="storeBy" placeholder="店舗担当者氏名入力" value="${escapeHtml(storeByVal)}" ${canStore ? '' : 'disabled'}>
       </div>
       <div class="alert-comment-block mgr">
-        <label class="alert-comment-label">改善策（業態責任者以上）</label>
+        <label class="alert-comment-label">改善策（業態責任者・店長・リーダー）</label>
         <textarea class="input alert-comment" data-alert-store="${r.store.id}" data-alert-field="managerComment" rows="2" placeholder="改善に向けた指示・対応策" ${canMgr ? '' : 'disabled'}>${escapeHtml(c.managerComment || '')}</textarea>
-        <input class="input alert-comment-name" data-alert-store="${r.store.id}" data-alert-field="managerBy" placeholder="業態責任者氏名入力" value="${escapeHtml(mgrByVal)}" ${canMgr ? '' : 'disabled'}>
+        <input class="input alert-comment-name" data-alert-store="${r.store.id}" data-alert-field="managerBy" placeholder="責任者・店長・リーダー氏名入力" value="${escapeHtml(mgrByVal)}" ${canMgr ? '' : 'disabled'}>
       </div>
     </div>`;
   }).join('');
