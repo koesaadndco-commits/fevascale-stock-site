@@ -931,9 +931,10 @@ async function loadAll() {
   ];
   let brandsFromDb = null;
   // 起動時の読み込みを並列化（順次awaitだとデータ件数ぶん待たされ「ログインが遅い」原因になる）
-  let _preVer = null, _preItems = null, _preStores = null, _preUsers = null, _preSupNotes = null, _preSuppliersByBrand = null;
+  // 棚卸データ・アプリ設定も同じバッチに含めて、往復回数を減らす
+  let _preVer = null, _preItems = null, _preStores = null, _preUsers = null, _preSupNotes = null, _preSuppliersByBrand = null, _preSettings = null;
   try {
-    [brandsFromDb, _preVer, _preItems, _preStores, _preUsers, _preSupNotes, _preSuppliersByBrand] = await Promise.all([
+    [brandsFromDb, _preVer, _preItems, _preStores, _preUsers, _preSupNotes, _preSuppliersByBrand, , , _preSettings] = await Promise.all([
       storage.get('brands').catch(() => null),
       storage.get('schema_version').catch(() => null),
       storage.get('master_items').catch(() => null),
@@ -942,6 +943,8 @@ async function loadAll() {
       storage.get('supplier_notes').catch(() => null),
       sbStorage.get('suppliers_by_brand').catch(() => null),
       loadBulletins().catch(() => null),
+      loadInventory(State.month).catch(() => null),   // 棚卸データを並行取得
+      storage.get('app_settings').catch(() => null),   // 締切等の設定を並行取得
     ]);
   } catch (e) {
     console.error('loadAll prefetch error', e);
@@ -1012,12 +1015,11 @@ async function loadAll() {
   // 新仕入先マスタ（業態別）
   State.suppliersByBrand = _preSuppliersByBrand || {};
 
-  // inventory for current month
-  await loadInventory(State.month);
+  // 棚卸データは上の並列バッチで loadInventory 済み
 
-  // アプリ設定（入力締切など）
+  // アプリ設定（入力締切など）※上の並列バッチで取得済みの _preSettings を使用
   try {
-    const settings = await storage.get('app_settings');
+    const settings = _preSettings;
     State.deadlines = (settings && settings.deadlines) || {};
     State.approvalDeadlines = (settings && settings.approval_deadlines) || {};
     State.soumuConfirmations = (settings && settings.soumu_confirmations) || {};
@@ -1665,9 +1667,73 @@ function canAccessAdmin() {
   return State.user?.role === 'admin' || (State.user?.role === 'manager' && managerAllowedBrands().length > 0);
 }
 
+// =========================================================
+// アプリ内ベル通知（掲示板投稿・棚卸完了・業態責任者の認印）
+// 既存データから最近の出来事を集約し、未読件数をベルに表示する
+// =========================================================
+function notifSeenKey(){ return 'notifSeen_' + (State.user?.id || 'anon'); }
+function notifLastSeen(){ const v = Number(localStorage.getItem(notifSeenKey()) || 0); return isNaN(v) ? 0 : v; }
+function notifMarkAllSeen(){ try { localStorage.setItem(notifSeenKey(), String(Date.now())); } catch(_){} }
+function buildNotifications(){
+  const list = [];
+  const u = State.user;
+  // 掲示板の新規投稿（自分の宛先ブランド or 全体）
+  const myBrands = (u && u.role === 'manager' && u.approveBrand && u.approveBrand !== 'all') ? [u.approveBrand, 'all'] : null;
+  for (const b of (State.bulletins || [])) {
+    if (myBrands && !myBrands.includes(b.brand)) continue;
+    const t = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    if (!t) continue;
+    const bl = b.brand === 'all' ? '全体' : brandLabel(b.brand);
+    list.push({ t, icon: '📌', title: `掲示板：${bl}`, body: `${b.authorName || ''}「${(b.body||'').slice(0,28)}${(b.body||'').length>28?'…':''}」` });
+  }
+  // 棚卸の店舗完了・業態責任者の認印
+  for (const s of (State.stores || [])) {
+    const inv = State.inventory[s.id] || {};
+    if (inv.completedAt) {
+      const t = new Date(inv.completedAt).getTime();
+      if (t) list.push({ t, icon: '📋', title: '棚卸 完了', body: `${slipStoreName(s.id)}${inv.inputBy ? `（${inv.inputBy}）` : ''}` });
+    }
+    if (inv.mgrConfirmedAt && inv.mgrConfirmedBy) {
+      const t = new Date(inv.mgrConfirmedAt).getTime();
+      if (t) list.push({ t, icon: '🖋', title: '業態責任者 認印', body: `${slipStoreName(s.id)}　承認：${inv.mgrConfirmedBy}` });
+    }
+  }
+  list.sort((a, b) => b.t - a.t);
+  return list.slice(0, 40);
+}
+function notifUnreadCount(){ const seen = notifLastSeen(); return buildNotifications().filter(n => n.t > seen).length; }
+window.toggleNotifPanel = function(){
+  let panel = document.getElementById('notif-panel');
+  if (panel) { panel.remove(); return; }
+  const items = buildNotifications();
+  const seen = notifLastSeen();
+  const fmt = (t) => { try { return new Date(t).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }); } catch(e){ return ''; } };
+  panel = document.createElement('div');
+  panel.id = 'notif-panel';
+  panel.className = 'notif-panel';
+  panel.innerHTML = `
+    <div class="notif-head">お知らせ<button class="notif-close" onclick="document.getElementById('notif-panel')?.remove()">✕</button></div>
+    <div class="notif-list">
+      ${items.length === 0 ? '<div class="notif-empty">新しいお知らせはありません</div>' :
+        items.map(n => `<div class="notif-item${n.t > seen ? ' unread' : ''}">
+          <span class="notif-ic">${n.icon}</span>
+          <div class="notif-txt"><div class="notif-title">${escapeHtml(n.title)}</div><div class="notif-body">${escapeHtml(n.body)}</div><div class="notif-time">${fmt(n.t)}</div></div>
+        </div>`).join('')}
+    </div>`;
+  document.body.appendChild(panel);
+  notifMarkAllSeen();
+  const badge = document.getElementById('notif-badge'); if (badge) badge.remove();
+  // 外側クリックで閉じる
+  setTimeout(() => {
+    const onDoc = (e) => { if (!panel.contains(e.target) && !e.target.closest('[data-action="toggle-notif"]')) { panel.remove(); document.removeEventListener('click', onDoc); } };
+    document.addEventListener('click', onDoc);
+  }, 30);
+};
+
 function renderTopbar() {
   // brandClassはCSSで定義された色をブランドIDから取得
   const brandClass = State.brand && State.brand !== 'all' ? `brand-${State.brand}` : '';
+  const _unread = (() => { try { return notifUnreadCount(); } catch(e){ return 0; } })();
   const userName = State.user ? State.user.name : '';
   const isAdmin = State.user?.role === 'admin';
   return `
@@ -1683,6 +1749,10 @@ function renderTopbar() {
     </button>` : ''}
     ${State.user?.isSuperAdmin ? `<button class="icon-btn" data-action="goto-console" title="KOESAコンソール（super_admin専用）" style="color:#0e7490;font-size:18px;">⚙️</button>` : ''}
     ${State.user?.role === 'admin' ? `<button class="icon-btn" data-action="save-diag" title="接続・保存の診断">🔌</button>` : ''}
+    <button class="icon-btn notif-btn" data-action="toggle-notif" title="お知らせ" style="position:relative;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      ${_unread > 0 ? `<span id="notif-badge" class="notif-badge">${_unread > 99 ? '99+' : _unread}</span>` : ''}
+    </button>
     <button class="icon-btn" data-action="refresh-data" title="最新データに更新（ログアウトしません）">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
     </button>
@@ -1774,6 +1844,19 @@ function currentSlipPeriod() {
   let y = d.getFullYear(), m = d.getMonth();
   if (d.getDate() >= 21) { m += 1; if (m > 11) { m = 0; y += 1; } } // 20日締め・21日〜翌月度
   return `${y}-${String(m + 1).padStart(2, '0')}`;
+}
+// currentSlipPeriod の1つ前の月度
+function previousSlipPeriod() {
+  const [y, m] = currentSlipPeriod().split('-').map(Number);
+  let py = y, pm = m - 1; if (pm < 1) { pm = 12; py -= 1; }
+  return `${py}-${String(pm).padStart(2, '0')}`;
+}
+// その月度で新規発行できるか：当月度は常にOK。締め直後（21〜22日）は直前の月度も発行可（翌月度22日まで）
+function canIssueSlipForPeriod(period) {
+  if (period === currentSlipPeriod()) return true;
+  const day = new Date().getDate();
+  if ((day === 21 || day === 22) && period === previousSlipPeriod()) return true;
+  return false;
 }
 function slipStoreName(id) {
   const s = State.stores.find(x => x.id === id);
@@ -3163,12 +3246,12 @@ function renderTransfers() {
       <span>${formatMonth(period)}（20日締め・21日〜翌月度）</span>
       <button class="btn btn-outline btn-sm" onclick="slipChangePeriod(1)" type="button" title="次の月度">›</button>
     </div>
-    ${period !== currentSlipPeriod() ? `<div style="margin-top:6px;font-size:12px;font-weight:700;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;display:inline-block;padding:3px 10px;">閲覧中：${formatMonth(period)}の伝票（新規発行は当月度のみ）</div>` : ''}
+    ${period !== currentSlipPeriod() ? `<div style="margin-top:6px;font-size:12px;font-weight:700;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;display:inline-block;padding:3px 10px;">閲覧中：${formatMonth(period)}の伝票${canIssueSlipForPeriod(period) ? '（締め直後のため、この月度もまだ発行できます）' : '（新規発行は当月度のみ）'}</div>` : ''}
   </div>
   <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-    ${canCreate && period === currentSlipPeriod() ? `<button class="btn btn-primary" data-action="new-slip">＋ 新規伝票を作成</button>` : ''}
+    ${canCreate && canIssueSlipForPeriod(period) ? `<button class="btn btn-primary" data-action="new-slip">＋ 新規伝票を作成</button>` : ''}
     <div style="flex:1"></div>
-    ${slips.length > 0 ? `<button class="btn btn-secondary btn-sm" data-action="print-slips">🖨 伝票を印刷（A4 6枚/頁）</button>` : ''}
+    ${slips.length > 0 ? `<button class="btn btn-secondary btn-sm" data-action="print-slips">🖨 伝票を印刷</button>` : ''}
   </div>
   ${rows}
   `;
@@ -3348,7 +3431,7 @@ function openCreateSlipModal() {
       if (!sellerName) { toast('対応者氏名を入力してください', 'error'); return false; }
       const slip = {
         id: 'slip_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-        month: currentSlipPeriod(), fromStore: from, toStore: to,
+        month: (canIssueSlipForPeriod(State.slipPeriod) ? State.slipPeriod : currentSlipPeriod()), fromStore: from, toStore: to,
         date: document.getElementById('slip-date').value, time: document.getElementById('slip-time').value,
         lines, sellerName, sellerSig: 'seal', sellerAt: new Date().toISOString(),
         status: 'sent', createdBy: u.name || ''
@@ -5776,6 +5859,7 @@ async function handleAction(e) {
     }
     case 'logout': doLogout(); break;
     case 'save-diag': await saveDiagnostics(); break;
+    case 'toggle-notif': toggleNotifPanel(); break;
     case 'refresh-data': await refreshData(); break;
     case 'save-deadline': await saveDeadline(); break;
     case 'clear-deadline': await clearDeadline(); break;

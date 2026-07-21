@@ -1589,3 +1589,18 @@
 .brand-hyonchan-color { color: #b45309; }
 .btn-brand-hyonchan { background: #b45309; color: #fff; }
 .btn-brand-hyonchan:hover { background: #92400e; }
+
+/* アプリ内ベル通知 */
+.notif-badge { position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px; background: #dc2626; color: #fff; font-size: 10px; font-weight: 800; line-height: 16px; text-align: center; border-radius: 9px; box-shadow: 0 0 0 2px #0f1c14; }
+.notif-panel { position: fixed; top: 54px; right: 12px; width: min(360px, 92vw); max-height: 70vh; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.28); z-index: 99998; display: flex; flex-direction: column; overflow: hidden; }
+.notif-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; font-weight: 800; color: #1e293b; border-bottom: 1px solid #eef2f7; }
+.notif-close { background: none; border: none; font-size: 16px; color: #94a3b8; cursor: pointer; }
+.notif-list { overflow-y: auto; }
+.notif-empty { padding: 24px 14px; text-align: center; color: #94a3b8; font-size: 13px; }
+.notif-item { display: flex; gap: 10px; padding: 11px 14px; border-bottom: 1px solid #f1f5f9; }
+.notif-item.unread { background: #eff6ff; }
+.notif-ic { font-size: 18px; flex: 0 0 auto; }
+.notif-txt { min-width: 0; }
+.notif-title { font-size: 12.5px; font-weight: 700; color: #0f766e; }
+.notif-body { font-size: 13px; color: #334155; margin: 1px 0; word-break: break-word; }
+.notif-time { font-size: 11px; color: #94a3b8; }
