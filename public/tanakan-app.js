@@ -2081,8 +2081,8 @@ async function flSaveConfig(){
   if(error){ _lastDbError='設定保存: '+(error.message||JSON.stringify(error)); toast(_lastDbError,'error'); return false; }
   return true;
 }
-async function loadFoodLoss(){
-  const period = currentSlipPeriod();
+async function loadFoodLoss(period){
+  period = period || State.foodLossPeriod || currentSlipPeriod();
   State.foodLossPeriod = period;
   await flLoadConfig();
   // 入力者の既定店舗をドラフトに
@@ -2091,6 +2091,14 @@ async function loadFoodLoss(){
   const list = await flFetch(period);
   if(list!==null) State.foodLoss = list;
 }
+// 月度の切り替え（伝票と同じ・締め直後は前月度も記録可）
+window.flChangePeriod = async function(delta){
+  const cur = State.foodLossPeriod || currentSlipPeriod();
+  const [y,m] = cur.split('-').map(Number);
+  let ny=y, nm=m+delta; while(nm<1){nm+=12;ny--;} while(nm>12){nm-=12;ny++;}
+  const np = `${ny}-${String(nm).padStart(2,'0')}`;
+  await loadFoodLoss(np); render();
+};
 
 // ---- 入力フォームのフィールド更新（自己完結グローバル関数） ----
 function flItemsForStore(storeId){
@@ -2121,6 +2129,8 @@ window.flClearDraft = function(){
 
 window.flAdd = async function(){
   const d = State.foodLossDraft;
+  const _fp = State.foodLossPeriod || currentSlipPeriod();
+  if(!canIssueSlipForPeriod(_fp)){ toast('この月度は記録できません（当月度、または締め直後22日までの前月度のみ）','error'); return; }
   if(!d.storeId){ toast('店舗を選択してください','error'); return; }
   if(!d.category){ toast('区分を選択してください','error'); return; }
   if(!d.staffName || !d.staffName.trim()){ toast('氏名を入力してください','error'); return; }
@@ -2354,7 +2364,12 @@ function renderFoodLoss(){
   <div class="fl-wrap">
     <div class="p-header fl-page-head" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <h1 style="margin:0;">🗑️ 食材ロス記録</h1>
-      <span class="fl-period">${formatMonth(period)}（21日〜翌20日／20日締め）</span>
+      <span style="display:inline-flex;align-items:center;gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="flChangePeriod(-1)" type="button" title="前の月度">‹</button>
+        <span class="fl-period">${formatMonth(period)}（21日〜翌20日／20日締め）</span>
+        <button class="btn btn-outline btn-sm" onclick="flChangePeriod(1)" type="button" title="次の月度">›</button>
+      </span>
+      ${period !== currentSlipPeriod() ? `<span style="font-size:12px;font-weight:700;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:3px 10px;">閲覧中：${formatMonth(period)}${canIssueSlipForPeriod(period) ? `（締め直後のため <u>${new Date().getMonth() + 1}月22日</u> まで記録可能）` : '（記録は当月度のみ）'}</span>` : (canIssueSlipForPeriod(previousSlipPeriod()) ? `<span style="font-size:12px;font-weight:700;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:3px 10px;">前月度（${formatMonth(previousSlipPeriod())}）も <u>${new Date().getMonth() + 1}月22日</u> まで記録できます（「‹」で前月度へ）</span>` : '')}
     </div>
     <div class="fl-card">
       <h3>Excel・印刷</h3>
@@ -2645,8 +2660,8 @@ async function kbItemsBulkSave(rows){
   return true;
 }
 
-async function loadBreakage(){
-  const period = currentSlipPeriod();
+async function loadBreakage(period){
+  period = period || State.breakagePeriod || currentSlipPeriod();
   State.breakagePeriod = period;
   await kbItemsFetch();
   await flLoadConfig();
@@ -2657,6 +2672,13 @@ async function loadBreakage(){
   const list = await kbFetch(period);
   if(list!==null) State.breakage = list;
 }
+window.kbChangePeriod = async function(delta){
+  const cur = State.breakagePeriod || currentSlipPeriod();
+  const [y,m] = cur.split('-').map(Number);
+  let ny=y, nm=m+delta; while(nm<1){nm+=12;ny--;} while(nm>12){nm-=12;ny++;}
+  const np = `${ny}-${String(nm).padStart(2,'0')}`;
+  await loadBreakage(np); render();
+};
 
 // ---- 入力フォーム操作 ----
 window.kbField = function(key, val){ State.breakageDraft[key]=val; if(key==='storeId'){ State.breakageDraft.itemId=''; State.breakageDraft.itemName=''; renderBreakageInline(); } };
@@ -2677,6 +2699,8 @@ window.kbClearDraft = function(){
 };
 window.kbAdd = async function(){
   const d = State.breakageDraft;
+  const _kp = State.breakagePeriod || currentSlipPeriod();
+  if(!canIssueSlipForPeriod(_kp)){ toast('この月度は記録できません（当月度、または締め直後22日までの前月度のみ）','error'); return; }
   if(!d.storeId){ toast('店舗を選択してください','error'); return; }
   if(!d.category){ toast('区分を選択してください','error'); return; }
   if(!d.staffName || !d.staffName.trim()){ toast('氏名を入力してください','error'); return; }
@@ -2808,7 +2832,12 @@ function renderBreakage(){
   <div class="fl-wrap">
     <div class="fl-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <h1 style="margin:0;font-size:20px;color:#1e293b;">🍽️ 器物破損管理</h1>
-      <span class="fl-period kb-period">${formatMonth(period)}（21日〜翌20日／20日締め）</span>
+      <span style="display:inline-flex;align-items:center;gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="kbChangePeriod(-1)" type="button" title="前の月度">‹</button>
+        <span class="fl-period kb-period">${formatMonth(period)}（21日〜翌20日／20日締め）</span>
+        <button class="btn btn-outline btn-sm" onclick="kbChangePeriod(1)" type="button" title="次の月度">›</button>
+      </span>
+      ${period !== currentSlipPeriod() ? `<span style="font-size:12px;font-weight:700;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:3px 10px;">閲覧中：${formatMonth(period)}${canIssueSlipForPeriod(period) ? `（締め直後のため <u>${new Date().getMonth() + 1}月22日</u> まで記録可能）` : '（記録は当月度のみ）'}</span>` : (canIssueSlipForPeriod(previousSlipPeriod()) ? `<span style="font-size:12px;font-weight:700;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:3px 10px;">前月度（${formatMonth(previousSlipPeriod())}）も <u>${new Date().getMonth() + 1}月22日</u> まで記録できます（「‹」で前月度へ）</span>` : '')}
     </div>
     <div class="fl-card">
       <h3>Excel・印刷</h3>
