@@ -1867,7 +1867,7 @@ function slipStoreName(id) {
   return s.name;
 }
 // スタッフ相当（店舗メンバー）：一般スタッフ＋店舗リーダー。店舗単位の入力権限を共有する
-function isStaffLike(role) { return role === 'staff' || role === 'store_leader'; }
+function isStaffLike(role) { return role === 'staff' || role === 'store_leader' || role === 'trainer'; }
 function canCreateSlipFrom(storeId) {
   const u = State.user; if (!u) return false;
   if (u.role === 'admin') return true;
@@ -3842,7 +3842,7 @@ function canEditStoreComment(storeId) {
 function isStoreLeader(storeId) {
   const u = State.user; if (!u) return false;
   if (!isStaffLike(u.role) || u.defaultStore !== storeId) return false;
-  if (u.role === 'store_leader') return true; // 権限が店舗リーダーなら役職に関わらずOK
+  if (u.role === 'store_leader' || u.role === 'trainer') return true; // 店舗リーダー・トレーナーは役職に関わらずOK
   const pos = u.position || '';
   return ['店長', 'リーダー', '係長', '副店長', 'SV'].some(k => pos.includes(k));
 }
@@ -5365,13 +5365,13 @@ function renderAdminSuppliers() {
 // ユーザー一覧：Excel 出力 / テンプレDL / 一括取込
 //   取込は「同じID＝上書き・無いID＝追加」の非破壊マージ。
 // =========================================================
-const USER_ROLE_LABEL = { super_admin:'スーパー管理者', admin:'管理者', manager:'業態責任者', store_leader:'店舗リーダー', staff:'スタッフ', soumu:'総務', director:'役員' };
+const USER_ROLE_LABEL = { super_admin:'スーパー管理者', admin:'管理者', manager:'業態責任者', store_leader:'店舗リーダー', trainer:'トレーナー', staff:'スタッフ', soumu:'総務', director:'役員' };
 function userRoleToLabel(v){ return USER_ROLE_LABEL[v] || v || 'スタッフ'; }
 function userLabelToRole(s){
   const t = String(s||'').trim();
   const hit = Object.keys(USER_ROLE_LABEL).find(k => USER_ROLE_LABEL[k] === t);
   if (hit) return hit;
-  if (['super_admin','admin','manager','store_leader','staff','soumu','director'].includes(t)) return t;
+  if (['super_admin','admin','manager','store_leader','trainer','staff','soumu','director'].includes(t)) return t;
   return 'staff';
 }
 function userStoreToName(id){ const s=(State.stores||[]).find(x=>x.id===id); return s?s.name:''; }
@@ -5507,6 +5507,7 @@ function renderAdminUsers() {
             <option value="admin"   ${u.role === 'admin'   ? 'selected' : ''}>管理者</option>
             <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>業態責任者</option>
             <option value="store_leader" ${u.role === 'store_leader' ? 'selected' : ''}>店舗リーダー</option>
+            <option value="trainer" ${u.role === 'trainer' ? 'selected' : ''}>トレーナー</option>
             <option value="staff"   ${u.role === 'staff'   ? 'selected' : ''}>スタッフ</option>
             <option value="soumu"   ${u.role === 'soumu'   ? 'selected' : ''}>総務</option>
             <option value="director" ${u.role === 'director' ? 'selected' : ''}>役員（確認押印）</option>
