@@ -2474,13 +2474,14 @@ function renderFoodLossRanking(forPrint){
   const rows = forPrint ? (State.foodLoss||[]) : flVisibleRows();
   if(!rows.length){ return forPrint ? '<p>当月度のデータがありません。</p>'
     : '<div class="fl-card"><h3>🏆 ロス実績ランキング</h3><div class="fl-empty">当月度のデータがありません。</div></div>'; }
-  const sumBy=(key)=>{ const m={}; rows.forEach(r=>{ const k=(r[key]!=null&&r[key]!=='')?r[key]:'(未設定)'; m[k]=(m[k]||0)+(Number(r.amountExcl)||0); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
+  // 金額0円（未入力・単価0）は実績ランキングから除外し、多い順に並べる
+  const sumBy=(key)=>{ const m={}; rows.forEach(r=>{ const k=(r[key]!=null&&r[key]!=='')?r[key]:'(未設定)'; m[k]=(m[k]||0)+(Number(r.amountExcl)||0); }); return Object.entries(m).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]); };
   const byStore=sumBy('storeId').map(([k,v])=>[flStoreName(k),v]);
   const byItem=sumBy('itemName').slice(0,10);
   const byCat=sumBy('category');
   const tbl=(title,arr,col)=>'<h4 style="margin:12px 0 6px;font-size:13px;color:#334155;">'+title+'</h4>'+
     '<table class="fl-table"><thead><tr><th>順位</th><th>'+col+'</th><th class="num">廃棄額(税抜)</th></tr></thead><tbody>'+
-    arr.map((e,i)=>'<tr><td>'+(i+1)+'</td><td>'+escapeHtml(String(e[0]))+'</td><td class="num">¥'+(Number(e[1])||0).toLocaleString('ja-JP')+'</td></tr>').join('')+
+    (arr.length ? arr.map((e,i)=>'<tr><td>'+(i+1)+'</td><td>'+escapeHtml(String(e[0]))+'</td><td class="num">¥'+(Number(e[1])||0).toLocaleString('ja-JP')+'</td></tr>').join('') : '<tr><td colspan="3" style="color:#94a3b8;text-align:center;">金額のある記録がありません</td></tr>')+
     '</tbody></table>';
   const inner=tbl('■ 店舗別',byStore,'店舗')+tbl('■ 商品別 TOP10',byItem,'商品')+tbl('■ 区分別',byCat,'区分');
   return forPrint ? inner : '<div class="fl-card"><h3>🏆 ロス実績ランキング（廃棄金額・税抜）</h3>'+inner+'</div>';
@@ -2876,13 +2877,14 @@ function renderBreakageRanking(forPrint){
   const rows = forPrint ? (State.breakage||[]) : kbVisibleRows();
   if(!rows.length){ return forPrint ? '<p>当月度のデータがありません。</p>'
     : '<div class="fl-card"><h3>🏆 破損実績ランキング</h3><div class="fl-empty">当月度のデータがありません。</div></div>'; }
-  const sumBy=(key)=>{ const m={}; rows.forEach(r=>{ const k=(r[key]!=null&&r[key]!=='')?r[key]:'(未設定)'; m[k]=(m[k]||0)+(Number(r.amountExcl)||0); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
+  // 金額0円（未入力・単価0）は実績ランキングから除外し、多い順に並べる
+  const sumBy=(key)=>{ const m={}; rows.forEach(r=>{ const k=(r[key]!=null&&r[key]!=='')?r[key]:'(未設定)'; m[k]=(m[k]||0)+(Number(r.amountExcl)||0); }); return Object.entries(m).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]); };
   const byStore=sumBy('storeId').map(([k,v])=>[kbStoreName(k),v]);
   const byItem=sumBy('itemName').slice(0,10);
   const byCat=sumBy('category');
   const tbl=(title,arr,col)=>'<h4 style="margin:12px 0 6px;font-size:13px;color:#334155;">'+title+'</h4>'+
     '<table class="fl-table"><thead><tr><th>順位</th><th>'+col+'</th><th class="num">破棄額(税抜)</th></tr></thead><tbody>'+
-    arr.map((e,i)=>'<tr><td>'+(i+1)+'</td><td>'+escapeHtml(String(e[0]))+'</td><td class="num">¥'+(Number(e[1])||0).toLocaleString('ja-JP')+'</td></tr>').join('')+
+    (arr.length ? arr.map((e,i)=>'<tr><td>'+(i+1)+'</td><td>'+escapeHtml(String(e[0]))+'</td><td class="num">¥'+(Number(e[1])||0).toLocaleString('ja-JP')+'</td></tr>').join('') : '<tr><td colspan="3" style="color:#94a3b8;text-align:center;">金額のある記録がありません</td></tr>')+
     '</tbody></table>';
   const inner=tbl('■ 店舗別',byStore,'店舗')+tbl('■ 備品別 TOP10',byItem,'備品')+tbl('■ 区分別',byCat,'区分');
   return forPrint ? inner : '<div class="fl-card"><h3>🏆 破損実績ランキング（破棄金額・税抜）</h3>'+inner+'</div>';
