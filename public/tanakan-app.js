@@ -724,7 +724,7 @@ async function applyRealtime() {
 function startRealtimeSync() {
   if (!sb || _realtimeChannel) return;
   // 購読範囲を役割で限定（Realtimeメッセージ削減）：店舗(staff)は自店のみ／責任者・役員・本社・管理者は全店
-  const _rtStore = (State.user && State.user.role === 'staff' && State.user.defaultStore) ? State.user.defaultStore : null;
+  const _rtStore = (State.user && isStaffLike(State.user.role) && State.user.defaultStore) ? State.user.defaultStore : null;
   const _entOpt  = _rtStore ? { event: '*', schema: 'public', table: 'inventory_entries', filter: 'store_id=eq.' + _rtStore } : { event: '*', schema: 'public', table: 'inventory_entries' };
   const _metaOpt = _rtStore ? { event: '*', schema: 'public', table: 'inventory_meta',    filter: 'store_id=eq.' + _rtStore } : { event: '*', schema: 'public', table: 'inventory_meta' };
   _realtimeChannel = sb.channel('app-sync')
@@ -1325,7 +1325,7 @@ function getHighValueItems(storeId) {
 }
 
 function getStoreStaff(storeId) {
-  return State.users.filter(u => !u.archived && u.role === 'staff' && u.defaultStore === storeId);
+  return State.users.filter(u => !u.archived && isStaffLike(u.role) && u.defaultStore === storeId);
 }
 
 // =========================================================
@@ -1866,18 +1866,20 @@ function slipStoreName(id) {
   if (bl && s.name && !s.name.includes(bl)) return `${bl} ${s.name}`;
   return s.name;
 }
+// スタッフ相当（店舗メンバー）：一般スタッフ＋店舗リーダー。店舗単位の入力権限を共有する
+function isStaffLike(role) { return role === 'staff' || role === 'store_leader'; }
 function canCreateSlipFrom(storeId) {
   const u = State.user; if (!u) return false;
   if (u.role === 'admin') return true;
   if (u.role === 'manager' && (u.approveBrand === 'all' || u.approveBrand === storeBrandOf(storeId))) return true;
-  if (u.role === 'staff' && u.defaultStore === storeId) return true;
+  if (isStaffLike(u.role) && u.defaultStore === storeId) return true;
   return false;
 }
 function canReceiveSlip(slip) {
   const u = State.user; if (!u) return false;
   if (u.role === 'admin') return true;
   if (u.role === 'manager' && (u.approveBrand === 'all' || u.approveBrand === storeBrandOf(slip.toStore))) return true;
-  if (u.role === 'staff' && u.defaultStore === slip.toStore) return true;
+  if (isStaffLike(u.role) && u.defaultStore === slip.toStore) return true;
   return false;
 }
 function canHqApprove() { const r = State.user?.role; return r === 'soumu' || r === 'admin'; }
@@ -2011,7 +2013,7 @@ function flAllowedStores(){
   const u = State.user; if(!u) return [];
   if(u.role === 'admin' || u.role === 'soumu') return all;
   if(u.role === 'manager') return all.filter(s => u.approveBrand === 'all' || u.approveBrand === storeBrandOf(s.id));
-  if(u.role === 'staff'){
+  if(isStaffLike(u.role)){
     // 担当店舗が設定されていればその店のみ、未設定なら全店から選択可（選択肢が空にならないように）
     const own = all.filter(s => s.id === u.defaultStore);
     return own.length ? own : all;
@@ -3239,7 +3241,7 @@ function renderTransfers() {
   const period = State.slipPeriod || currentSlipPeriod();
   const slips = visibleSlips();
   const u = State.user;
-  const canCreate = u && (u.role === 'admin' || u.role === 'manager' || u.role === 'staff' || u.role === 'soumu');
+  const canCreate = u && (u.role === 'admin' || u.role === 'manager' || isStaffLike(u.role) || u.role === 'soumu');
   const statusLabel = (st) => st === 'approved' ? '<span class="badge done">本社承認済</span>'
     : st === 'received' ? '<span class="badge pending">受取済（本社承認待）</span>'
     : st === 'sent' ? '<span class="badge empty">受取待ち</span>' : '<span class="badge empty">下書き</span>';
@@ -3833,13 +3835,14 @@ function canEditStoreComment(storeId) {
   const u = State.user; if (!u) return false;
   if (u.role === 'admin') return true;
   if (u.role === 'manager' && (u.approveBrand === 'all' || u.approveBrand === storeBrandOf(storeId))) return true;
-  if (u.role === 'staff' && u.defaultStore === storeId) return true;
+  if (isStaffLike(u.role) && u.defaultStore === storeId) return true;
   return false;
 }
 // 自店の店長・リーダー（役職に「店長」「リーダー」「係長」「副店長」「SV」を含むスタッフ）
 function isStoreLeader(storeId) {
   const u = State.user; if (!u) return false;
-  if (u.role !== 'staff' || u.defaultStore !== storeId) return false;
+  if (!isStaffLike(u.role) || u.defaultStore !== storeId) return false;
+  if (u.role === 'store_leader') return true; // 権限が店舗リーダーなら役職に関わらずOK
   const pos = u.position || '';
   return ['店長', 'リーダー', '係長', '副店長', 'SV'].some(k => pos.includes(k));
 }
@@ -4299,7 +4302,7 @@ function renderInventory() {
   if (storeConfirmed || lockedByDeadline) {
     canEdit = isAdminUser || isBrandManager;
   } else {
-    canEdit = (role === 'staff' || isAdminUser);
+    canEdit = (isStaffLike(role) || isAdminUser);
   }
   const readOnly = !canEdit;
   const completed = !!inv.completed || readOnly;
@@ -4340,10 +4343,10 @@ function renderInventory() {
 
   // Staff options for person dropdowns
   // Include: (a) staff at this store, (b) all staff/manager at same brand, (c) admin
-  const sameStoreStaff = State.users.filter(u => !u.archived && u.role === 'staff' && u.defaultStore === store.id);
+  const sameStoreStaff = State.users.filter(u => !u.archived && isStaffLike(u.role) && u.defaultStore === store.id);
   const sameBrandStaff = State.users.filter(u =>
     !u.archived &&
-    (u.role === 'staff' || u.role === 'manager') &&
+    (isStaffLike(u.role) || u.role === 'manager') &&
     u.defaultStore !== store.id && // not duplicating
     (u.defaultStore ? brandOf(u.defaultStore) === store.brand : (u.approveBrand === 'all' || u.approveBrand === store.brand))
   );
@@ -5362,13 +5365,13 @@ function renderAdminSuppliers() {
 // ユーザー一覧：Excel 出力 / テンプレDL / 一括取込
 //   取込は「同じID＝上書き・無いID＝追加」の非破壊マージ。
 // =========================================================
-const USER_ROLE_LABEL = { super_admin:'スーパー管理者', admin:'管理者', manager:'業態責任者', staff:'スタッフ', soumu:'総務', director:'役員' };
+const USER_ROLE_LABEL = { super_admin:'スーパー管理者', admin:'管理者', manager:'業態責任者', store_leader:'店舗リーダー', staff:'スタッフ', soumu:'総務', director:'役員' };
 function userRoleToLabel(v){ return USER_ROLE_LABEL[v] || v || 'スタッフ'; }
 function userLabelToRole(s){
   const t = String(s||'').trim();
   const hit = Object.keys(USER_ROLE_LABEL).find(k => USER_ROLE_LABEL[k] === t);
   if (hit) return hit;
-  if (['super_admin','admin','manager','staff','soumu','director'].includes(t)) return t;
+  if (['super_admin','admin','manager','store_leader','staff','soumu','director'].includes(t)) return t;
   return 'staff';
 }
 function userStoreToName(id){ const s=(State.stores||[]).find(x=>x.id===id); return s?s.name:''; }
@@ -5453,7 +5456,7 @@ function renderAdminUsers() {
       (u.position || '').toLowerCase().includes(filter));
   }
   if (filterStore) {
-    if (filterStore === '__admin__') list = list.filter(u => u.role !== 'staff');
+    if (filterStore === '__admin__') list = list.filter(u => !isStaffLike(u.role));
     else list = list.filter(u => u.defaultStore === filterStore);
   }
 
@@ -5503,6 +5506,7 @@ function renderAdminUsers() {
             <option value="super_admin" ${u.role === 'super_admin' ? 'selected' : ''}>スーパー管理者</option>
             <option value="admin"   ${u.role === 'admin'   ? 'selected' : ''}>管理者</option>
             <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>業態責任者</option>
+            <option value="store_leader" ${u.role === 'store_leader' ? 'selected' : ''}>店舗リーダー</option>
             <option value="staff"   ${u.role === 'staff'   ? 'selected' : ''}>スタッフ</option>
             <option value="soumu"   ${u.role === 'soumu'   ? 'selected' : ''}>総務</option>
             <option value="director" ${u.role === 'director' ? 'selected' : ''}>役員（確認押印）</option>
@@ -6131,7 +6135,7 @@ function openStore(storeId) {
   // admin and soumu can view any store
   // manager can view stores in their approveBrand
   // staff can only access their defaultStore
-  if (role === 'staff') {
+  if (isStaffLike(role)) {
     if (State.user.defaultStore && State.user.defaultStore !== storeId) {
       toast('この店舗へのアクセス権がありません', 'error');
       return;
