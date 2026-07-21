@@ -1858,6 +1858,14 @@ function canIssueSlipForPeriod(period) {
   if ((day === 21 || day === 22) && period === previousSlipPeriod()) return true;
   return false;
 }
+// 店舗名の表示（ブランド名を先頭に付けて区別しやすくする。既に名前に含まれていれば付けない）
+// idでも店舗オブジェクトでも受け取れる
+function storeDisp(x){
+  const s = (typeof x === 'string') ? (State.stores || []).find(v => v.id === x) : x;
+  if (!s) return (typeof x === 'string') ? x : '';
+  const bl = brandLabel(s.brand);
+  return (bl && s.name && !s.name.includes(bl)) ? `${bl} ${s.name}` : (s.name || '');
+}
 function slipStoreName(id) {
   const s = State.stores.find(x => x.id === id);
   if (!s) return id;
@@ -2025,7 +2033,7 @@ function flVisibleRows(){
   const allowed = new Set(flAllowedStores().map(s=>s.id));
   return (State.foodLoss||[]).filter(r => allowed.has(r.storeId));
 }
-function flStoreName(id){ const s=(State.stores||[]).find(x=>x.id===id); return s?s.name:id; }
+function flStoreName(id){ return storeDisp(id); }
 // 店舗名にブランドを付けて重複を区別（例：【8番らーめん】鯖江店）。名前に既にブランド名があれば付け直さない
 function storeLabelWithBrand(s){
   if(!s) return '';
@@ -3018,7 +3026,7 @@ async function refreshBadges(){
 //   付与＝①食材ロス少ない順 ②器物破損少ない順 ③棚卸金額(少ない順) の各1/2/3位
 //   コンソールの coin フラグONで表示。集計対象は棚卸実施済み(合計>0)の店舗のみ
 // =========================================================
-function coinStoreName(id){ const s=(State.stores||[]).find(x=>x.id===id); return s?s.name:id; }
+function coinStoreName(id){ return storeDisp(id); }
 // FevaCOIN のリアルコイン画像（未配置でも onerror で 🪙 に自動フォールバック）
 const FEVACOIN_IMG = '/assets/fevacoin.png';
 function coinIcon(px){
@@ -3707,7 +3715,7 @@ function renderSoumuConfirmSection() {
   const block = soumuBlockReason();
   if (block) {
     return `<div class="soumu-block">
-      本社確認に進めません。<strong>${escapeHtml(block.store.name)}</strong> の業態責任者 <strong>${escapeHtml(block.managerName)}</strong> さんの承認作業を先に実施してください。
+      本社確認に進めません。<strong>${escapeHtml(storeDisp(block.store))}</strong> の業態責任者 <strong>${escapeHtml(block.managerName)}</strong> さんの承認作業を先に実施してください。
     </div>`;
   }
   return `<div class="soumu-confirm-ready">
@@ -3721,7 +3729,7 @@ async function confirmSoumu() {
   if (role !== 'soumu' && role !== 'admin') { toast('権限がありません', 'error'); return; }
   const block = soumuBlockReason();
   if (block) {
-    toast(`${block.store.name}の業態責任者 ${block.managerName}さんの承認作業を先に実施してください`, 'error');
+    toast(`${storeDisp(block.store)}の業態責任者 ${block.managerName}さんの承認作業を先に実施してください`, 'error');
     return;
   }
   if (!confirm(`${formatMonth(State.month)} の本社確認を完了しますか？`)) return;
@@ -3771,13 +3779,13 @@ function renderApprovalSection() {
     const inv = State.inventory[s.id] || {};
     return `<div class="approve-status-row">
       <span class="brand-tag ${s.brand}">${brandLabel(s.brand)}</span>
-      <span class="name">${escapeHtml(s.name)}</span>
+      <span class="name">${escapeHtml(storeDisp(s))}</span>
       ${st}
       <span class="by">${signed ? escapeHtml(inv.mgrConfirmedBy || '') : ''}</span>
     </div>`;
   }).join('');
   const banner = block
-    ? `<div class="soumu-block">本社確認に進めません。<strong>${escapeHtml(block.store.name)}</strong> の業態責任者 <strong>${escapeHtml(block.managerName)}</strong> さんの承認作業を先に実施してください。</div>`
+    ? `<div class="soumu-block">本社確認に進めません。<strong>${escapeHtml(storeDisp(block.store))}</strong> の業態責任者 <strong>${escapeHtml(block.managerName)}</strong> さんの承認作業を先に実施してください。</div>`
     : `<div class="soumu-ready">✓ 全店の確認・署名が完了しました。本社総務部の最終確認に進めます。</div>`;
   return `
     <div class="approval-section">
@@ -3799,7 +3807,7 @@ async function submitApproval(brand) {
   const brandStores = State.stores.filter(s => s.brand === brand);
   const notDone = brandStores.filter(s => getStoreStatus(s.id) !== 'done');
   if (notDone.length > 0) {
-    toast(`未完了の店舗があります（${notDone.map(s => s.name).join('、')}）。全店完了後に承認できます`, 'error');
+    toast(`未完了の店舗があります（${notDone.map(s => storeDisp(s)).join('、')}）。全店完了後に承認できます`, 'error');
     render();
     return;
   }
@@ -3880,7 +3888,7 @@ function renderAlertSection(stores) {
         return `
         <div class="alert-rank-row">
           <span class="alert-rank-badge ${badge}">${rank}</span>
-          <span class="name">${escapeHtml(r.store.name)}</span>
+          <span class="name">${escapeHtml(storeDisp(r.store))}</span>
           <span class="alert-count">${r.count}件</span>
           <span class="amount num">${formatYen(r.totalAmount)}</span>
         </div>`;
@@ -3904,7 +3912,7 @@ function renderAlertSection(stores) {
     <div class="alert-store-card">
       <div class="alert-store-head">
         <span class="brand-tag ${escapeHtml(r.store.brand)}">${brandLabel(r.store.brand)}</span>
-        <strong>${escapeHtml(r.store.name)}</strong>
+        <strong>${escapeHtml(storeDisp(r.store))}</strong>
         <span class="alert-store-meta">${r.count}件 ／ ${formatYen(r.totalAmount)}</span>
       </div>
       <table class="alert-items-table">
@@ -3958,12 +3966,12 @@ function buildAlertPrintHTML() {
   }
   html += `<table class="p-alert-rank"><thead><tr><th>順位</th><th>店舗</th><th class="num">件数</th><th class="num">アラート金額</th></tr></thead><tbody>`;
   ranking.forEach((r, i) => {
-    html += `<tr><td>${i + 1}</td><td>${escapeHtml(r.store.name)}</td><td class="num">${r.count}</td><td class="num">${formatYen(r.totalAmount)}</td></tr>`;
+    html += `<tr><td>${i + 1}</td><td>${escapeHtml(storeDisp(r.store))}</td><td class="num">${r.count}</td><td class="num">${formatYen(r.totalAmount)}</td></tr>`;
   });
   html += `</tbody></table>`;
   for (const r of ranking) {
     const c = State.alertComments[r.store.id] || {};
-    html += `<div class="p-alert-store"><div class="p-alert-store-head">${brandLabel(r.store.brand)}　${escapeHtml(r.store.name)}　（${r.count}件 / ${formatYen(r.totalAmount)}）</div>`;
+    html += `<div class="p-alert-store"><div class="p-alert-store-head">${escapeHtml(storeDisp(r.store))}　（${r.count}件 / ${formatYen(r.totalAmount)}）</div>`;
     html += `<table class="p-table"><thead><tr><th>商品名</th><th class="num">数量</th><th class="num">単価</th><th class="num">金額</th><th class="num">設定</th></tr></thead><tbody>`;
     for (const it of r.items) {
       html += `<tr><td>${escapeHtml(it.name)}</td><td class="num">${it.qty.toLocaleString('ja-JP')}</td><td class="num">${formatYen(it.price)}</td><td class="num">${formatYen(it.amount)}</td><td class="num">${getItemThreshold(it).toLocaleString()}超</td></tr>`;
@@ -4030,7 +4038,7 @@ function renderRankings() {
       return `
       <div class="ranking-row">
         <span class="rank-badge ${badgeClass}">${rank}</span>
-        <span class="name">${escapeHtml(s.name)}</span>
+        <span class="name">${escapeHtml(storeDisp(s))}</span>
         <span class="amount num">${formatYen(s.foodTotal)}</span>
       </div>`;
     }).join('');
@@ -4070,7 +4078,7 @@ function renderRankings() {
 window.printInventoryRanking = function(){
   function rows(filter){
     return State.stores.filter(filter)
-      .map(s=>{ const t=getStoreTotals(s.id); return { name:s.name, food:t.food }; })
+      .map(s=>{ const t=getStoreTotals(s.id); return { name:storeDisp(s), food:t.food }; })
       .filter(s=>s.food>0).sort((a,b)=>a.food-b.food);
   }
   function table(title,list){
@@ -4262,7 +4270,7 @@ function renderStoresList(stores) {
       html += `
       <div class="store-row" data-action="open-store" data-store-id="${s.id}">
         <div>
-          <div class="name">${escapeHtml(s.name)}${coinStoreBadge(s.id)}</div>
+          <div class="name">${escapeHtml(storeDisp(s))}${coinStoreBadge(s.id)}</div>
           <div class="meta">
             ${badge}
             <span>${filled}/${totalItems}品目</span>
@@ -4409,7 +4417,7 @@ function renderInventory() {
     <div class="row between">
       <div>
         <span class="brand-tag ${store.brand}">${brandLabel(store.brand)}</span>
-        <div class="store-name" style="margin-top:6px;">${escapeHtml(store.name)}</div>
+        <div class="store-name" style="margin-top:6px;">${escapeHtml(storeDisp(store))}</div>
         <div class="muted small">${formatMonth(State.month)} 棚卸</div>
       </div>
       <div class="text-right">
@@ -5475,7 +5483,7 @@ function renderAdminUsers() {
       <select class="select" id="admin-filter-cat" style="width:200px;">
         <option value="">全員表示</option>
         <option value="__admin__" ${filterStore === '__admin__' ? 'selected' : ''}>管理職のみ</option>
-        ${stores.map(s => `<option value="${escapeHtml(s.id)}" ${filterStore === s.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
+        ${stores.map(s => `<option value="${escapeHtml(s.id)}" ${filterStore === s.id ? 'selected' : ''}>${escapeHtml(storeDisp(s))}</option>`).join('')}
       </select>
       <input class="input" id="admin-filter-input" placeholder="氏名/店舗名/IDで絞り込み..." value="${escapeHtml(State.adminFilter || '')}" style="width:200px;">
       <button class="btn btn-primary btn-sm" data-action="add-user">＋ ユーザーを追加</button>
@@ -5516,7 +5524,7 @@ function renderAdminUsers() {
         <div>
           <select class="select" data-edit-user-id="${escapeHtml(u.id)}" data-field="defaultStore">
             <option value="">（指定なし）</option>
-            ${stores.map(s => `<option value="${escapeHtml(s.id)}" ${u.defaultStore === s.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
+            ${stores.map(s => `<option value="${escapeHtml(s.id)}" ${u.defaultStore === s.id ? 'selected' : ''}>${escapeHtml(storeDisp(s))}</option>`).join('')}
           </select>
         </div>
         <div>
@@ -6395,7 +6403,7 @@ function addUserDialog() {
           <label class="field">所属店舗（スタッフのみ）</label>
           <select class="select" id="u-store">
             <option value="">（指定なし）</option>
-            ${stores.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('')}
+            ${stores.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(storeDisp(s))}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -6951,7 +6959,7 @@ function buildPrintHTML(storeId) {
     <div class="p-header">
       <div style="font-size:9pt;color:#666;">株式会社アモーレながすぎ</div>
       <span class="p-brand-pill ${store.brand}">${brandLabel(store.brand)}</span>
-      <h1>${escapeHtml(store.name)}　棚卸表</h1>
+      <h1>${escapeHtml(storeDisp(store))}　棚卸表</h1>
       <div class="p-meta">
         <div><strong>${formatMonth(State.month)}</strong></div>
         <div>${completedLine}</div>
@@ -7048,7 +7056,7 @@ function buildSheetRows(storeId) {
   const mgrSigX = sInvX.mgrConfirmedBy ? { by: sInvX.mgrConfirmedBy, at: sInvX.mgrConfirmedAt } : null;
   const rows = [];
   rows.push(['株式会社アモーレながすぎ 棚卸表']);
-  rows.push(['店舗名', store.name]);
+  rows.push(['店舗名', storeDisp(store)]);
   rows.push(['ブランド', brandLabel(store.brand)]);
   rows.push(['月度', formatMonth(State.month)]);
   rows.push(['入力者', inv.inputBy || '（未入力）']);
@@ -7201,8 +7209,8 @@ async function exportStoreXlsx(storeId) {
   styleWorksheet(ws);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '棚卸');
-  XLSX.writeFile(wb, `棚卸_${store.name}_${State.month}.xlsx`);
-  toast(`${store.name} をExcel出力しました`, 'success');
+  XLSX.writeFile(wb, `棚卸_${storeDisp(store)}_${State.month}.xlsx`);
+  toast(`${storeDisp(store)} をExcel出力しました`, 'success');
 }
 
 function _redBorderSide(){ return { style:'thin', color:{ rgb:'C00000' } }; }
@@ -7274,7 +7282,7 @@ async function exportAllStoresXlsx(brandFilter) {
 
   const addRanking = (title, filter) => {
     const list = State.stores.filter(filter)
-      .map(s => ({ name: s.name, food: getStoreTotals(s.id).food }))
+      .map(s => ({ name: storeDisp(s), food: getStoreTotals(s.id).food }))
       .filter(s => s.food > 0)
       .sort((a, b) => a.food - b.food);
     sum.push([]);
@@ -7751,7 +7759,7 @@ async function exportInventoryTemplateXlsx(storeId) {
 
   // 案内シート
   const guide = [];
-  guide.push([`${store.name} 棚卸表 入力テンプレート（${formatMonth(State.month)}）`]);
+  guide.push([`${storeDisp(store)} 棚卸表 入力テンプレート（${formatMonth(State.month)}）`]);
   guide.push([]);
   guide.push(['■ 使い方']);
   guide.push(['1. 「棚卸入力」シートを開いてください。']);
@@ -7770,7 +7778,7 @@ async function exportInventoryTemplateXlsx(storeId) {
 
   // 入力シート
   const rows = [];
-  rows.push([`${store.name}　棚卸表  ${formatMonth(State.month)}`]);
+  rows.push([`${storeDisp(store)}　棚卸表  ${formatMonth(State.month)}`]);
   rows.push([]);
   rows.push(['ID', 'カテゴリー', 'No', '品名', '仕入先', '単位', '単価(円)', '数量', '備考']);
   for (const it of sorted) {
