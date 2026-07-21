@@ -3246,7 +3246,8 @@ function renderTransfers() {
       <span>${formatMonth(period)}（20日締め・21日〜翌月度）</span>
       <button class="btn btn-outline btn-sm" onclick="slipChangePeriod(1)" type="button" title="次の月度">›</button>
     </div>
-    ${period !== currentSlipPeriod() ? `<div style="margin-top:6px;font-size:12px;font-weight:700;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;display:inline-block;padding:3px 10px;">閲覧中：${formatMonth(period)}の伝票${canIssueSlipForPeriod(period) ? '（締め直後のため、この月度もまだ発行できます）' : '（新規発行は当月度のみ）'}</div>` : ''}
+    ${period !== currentSlipPeriod() ? `<div style="margin-top:6px;font-size:12px;font-weight:700;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;display:inline-block;padding:3px 10px;">閲覧中：${formatMonth(period)}の伝票${canIssueSlipForPeriod(period) ? `（締め直後のため <u>${new Date().getMonth() + 1}月22日</u> まで発行可能）` : '（新規発行は当月度のみ）'}</div>` : ''}
+    ${period === currentSlipPeriod() && canIssueSlipForPeriod(previousSlipPeriod()) ? `<div style="margin-top:6px;font-size:12px;font-weight:700;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;display:inline-block;padding:3px 10px;">前月度（${formatMonth(previousSlipPeriod())}）の伝票も <u>${new Date().getMonth() + 1}月22日</u> まで発行できます（「‹」で前月度へ）</div>` : ''}
   </div>
   <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
     ${canCreate && canIssueSlipForPeriod(period) ? `<button class="btn btn-primary" data-action="new-slip">＋ 新規伝票を作成</button>` : ''}
