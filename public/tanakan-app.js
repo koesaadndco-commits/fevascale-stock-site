@@ -2060,15 +2060,34 @@ function flVisibleRows(){
   return (State.foodLoss||[]).filter(r => allowed.has(r.storeId));
 }
 function flStoreName(id){ return storeDisp(id); }
-// 店舗別ランキング（少ない順＝優秀）。棚卸実施の全店を対象にし、記録のない店は0円で1位側に並ぶ。
+// 店舗別ランキング。棚卸実施の全店を対象に、記録がある店（>0円）は少ない順で優秀、
+// 記録が0円の店は「ありえない＝管理不足」として別枠（zero）に分ける。
 // rows は当該実績（食材ロス or 器物破損）の可視行。金額は amountExcl の合計。
 function flStoreRanking(rows){
   const elig = flAllowedStores().filter(s=>{ try{ return getStoreTotals(s.id).total>0; }catch(_){ return false; } });
   const sum={}; (rows||[]).forEach(r=>{ if(r.storeId) sum[r.storeId]=(sum[r.storeId]||0)+(Number(r.amountExcl)||0); });
-  return elig
-    .map(s=>[flStoreName(s.id), Number(sum[s.id]||0), s.id])
-    .sort((a,b)=> a[1]-b[1] || String(a[2]).localeCompare(String(b[2])))
-    .map(x=>[x[0], x[1]]);
+  const withVal = elig.map(s=>({ name:flStoreName(s.id), val:Number(sum[s.id]||0), id:s.id }));
+  const recorded = withVal.filter(x=>x.val>0)
+    .sort((a,b)=> a.val-b.val || String(a.id).localeCompare(String(b.id)))
+    .map(x=>[x.name, x.val]);
+  const zero = withVal.filter(x=>x.val<=0)
+    .sort((a,b)=> String(a.name).localeCompare(String(b.name),'ja'))
+    .map(x=>[x.name, 0]);
+  return { recorded, zero };
+}
+// 店舗別ランキングのHTML。記録がある店は少ない順（同額同順位）、0円の店は減点警告を表示。
+function flStoreRankTableHTML(rankObj, amtLabel){
+  const rec = (rankObj && rankObj.recorded) || [];
+  const zero = (rankObj && rankObj.zero) || [];
+  const rk = rankTies(rec);
+  const recRows = rec.map((e,i)=>'<tr><td>'+rk[i]+'</td><td>'+escapeHtml(String(e[0]))+'</td><td class="num">¥'+(Number(e[1])||0).toLocaleString('ja-JP')+'</td></tr>').join('');
+  const zeroRows = zero.map(e=>'<tr style="background:#fef2f2;"><td style="color:#b91c1c;font-weight:700;">✕</td><td>'+escapeHtml(String(e[0]))+'<div style="font-size:11px;color:#b91c1c;font-weight:600;">0円はありえません。マネジメントができていません</div></td><td class="num" style="color:#dc2626;font-weight:700;">−5コイン</td></tr>').join('');
+  const body = (rec.length||zero.length) ? (recRows+zeroRows) : '<tr><td colspan="3" style="color:#94a3b8;text-align:center;">対象の店舗がありません</td></tr>';
+  const warn = zero.length ? '<div style="margin:6px 0 8px;padding:6px 10px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#b91c1c;font-size:12px;font-weight:700;">⚠ 0円はありえません。マネジメントができていません（各店 −5コイン）</div>' : '';
+  const note = '記録がある店＝少ない順で優秀／0円＝管理不足で減点（同額は同順位）';
+  return '<h4 style="margin:12px 0 6px;font-size:13px;color:#334155;">■ 店舗別ランキング<span style="font-weight:400;color:#94a3b8;font-size:11px;margin-left:6px;">'+note+'</span></h4>'
+    + warn
+    + '<table class="fl-table"><thead><tr><th>順位</th><th>店舗</th><th class="num">'+amtLabel+'</th></tr></thead><tbody>'+body+'</tbody></table>';
 }
 // 同額は同順位（競技方式：同順位の次はスキップ 例 0,0,2000 → 1,1,3）。arr は [ラベル, 金額] のソート済み配列。
 function rankTies(arr){
@@ -2522,13 +2541,13 @@ function renderFoodLossRanking(forPrint){
   const sumBy=(key)=>{ const m={}; rows.forEach(r=>{ const k=(r[key]!=null&&r[key]!=='')?r[key]:'(未設定)'; m[k]=(m[k]||0)+(Number(r.amountExcl)||0); }); return Object.entries(m).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]); };
   const byItem=sumBy('itemName').slice(0,10);
   const byCat=sumBy('category');
-  // 店舗別は「少ない順＝優秀」。棚卸実施の全店を対象にし、ロスなし（0円）を1位とする
+  // 店舗別：記録がある店は少ない順で優秀、0円の店は管理不足として減点表示
   const byStore=flStoreRanking(rows);
   const tbl=(title,arr,col,note)=>{ const rk=rankTies(arr); return '<h4 style="margin:12px 0 6px;font-size:13px;color:#334155;">'+title+(note?'<span style="font-weight:400;color:#94a3b8;font-size:11px;margin-left:6px;">'+note+'</span>':'')+'</h4>'+
     '<table class="fl-table"><thead><tr><th>順位</th><th>'+col+'</th><th class="num">廃棄額(税抜)</th></tr></thead><tbody>'+
     (arr.length ? arr.map((e,i)=>'<tr><td>'+rk[i]+'</td><td>'+escapeHtml(String(e[0]))+'</td><td class="num">¥'+(Number(e[1])||0).toLocaleString('ja-JP')+'</td></tr>').join('') : '<tr><td colspan="3" style="color:#94a3b8;text-align:center;">対象の店舗がありません</td></tr>')+
     '</tbody></table>'; };
-  const inner=tbl('■ 店舗別ランキング',byStore,'店舗','少ない順＝優秀（0円=ロスなしが1位・同額は同順位）')+tbl('■ 商品別 TOP10',byItem,'商品','')+tbl('■ 区分別',byCat,'区分','');
+  const inner=flStoreRankTableHTML(byStore,'廃棄額(税抜)')+tbl('■ 商品別 TOP10',byItem,'商品','')+tbl('■ 区分別',byCat,'区分','');
   return forPrint ? inner : '<div class="fl-card"><h3>🏆 ロス実績ランキング（廃棄金額・税抜）</h3>'+inner+'</div>';
 }
 window.flPrintRanking = function(){
@@ -2926,13 +2945,13 @@ function renderBreakageRanking(forPrint){
   const sumBy=(key)=>{ const m={}; rows.forEach(r=>{ const k=(r[key]!=null&&r[key]!=='')?r[key]:'(未設定)'; m[k]=(m[k]||0)+(Number(r.amountExcl)||0); }); return Object.entries(m).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]); };
   const byItem=sumBy('itemName').slice(0,10);
   const byCat=sumBy('category');
-  // 店舗別は「少ない順＝優秀」。棚卸実施の全店を対象にし、破損なし（0円）を1位とする
+  // 店舗別：記録がある店は少ない順で優秀、0円の店は管理不足として減点表示
   const byStore=flStoreRanking(rows);
   const tbl=(title,arr,col,note)=>{ const rk=rankTies(arr); return '<h4 style="margin:12px 0 6px;font-size:13px;color:#334155;">'+title+(note?'<span style="font-weight:400;color:#94a3b8;font-size:11px;margin-left:6px;">'+note+'</span>':'')+'</h4>'+
     '<table class="fl-table"><thead><tr><th>順位</th><th>'+col+'</th><th class="num">破棄額(税抜)</th></tr></thead><tbody>'+
     (arr.length ? arr.map((e,i)=>'<tr><td>'+rk[i]+'</td><td>'+escapeHtml(String(e[0]))+'</td><td class="num">¥'+(Number(e[1])||0).toLocaleString('ja-JP')+'</td></tr>').join('') : '<tr><td colspan="3" style="color:#94a3b8;text-align:center;">対象の店舗がありません</td></tr>')+
     '</tbody></table>'; };
-  const inner=tbl('■ 店舗別ランキング',byStore,'店舗','少ない順＝優秀（0円=破損なしが1位・同額は同順位）')+tbl('■ 備品別 TOP10',byItem,'備品','')+tbl('■ 区分別',byCat,'区分','');
+  const inner=flStoreRankTableHTML(byStore,'破棄額(税抜)')+tbl('■ 備品別 TOP10',byItem,'備品','')+tbl('■ 区分別',byCat,'区分','');
   return forPrint ? inner : '<div class="fl-card"><h3>🏆 破損実績ランキング（破棄金額・税抜）</h3>'+inner+'</div>';
 }
 window.kbPrintRanking = function(){
@@ -3115,21 +3134,25 @@ async function loadCoins(){
 function coinAutoLoad(){ if(State._coinLoadedFor !== State.month){ State._coinLoadedFor = State.month; loadCoins().then(()=>render()); } }
 
 // 当月のライブ集計（確定前のプレビュー）
+const COIN_ZERO_PENALTY = -5; // 0円（管理不足）ペナルティ：食材ロス・器物破損それぞれで減点
 function coinComputeMonth(month){
   const elig = (State.stores||[]).filter(s=>{ try{ return getStoreTotals(s.id).total>0; }catch(_){ return false; } });
   const lossSum=(id)=> (State.coinLoss||[]).filter(r=>r.storeId===id).reduce((a,b)=>a+(Number(b.amountExcl)||0),0);
   const brkSum =(id)=> (State.coinBreakage||[]).filter(r=>r.storeId===id).reduce((a,b)=>a+(Number(b.amountExcl)||0),0);
-  // その部門に「入力がある店舗」だけを対象にする（未入力＝0円で最少入賞してしまう不具合を防止）
-  const hasLoss=(id)=> (State.coinLoss||[]).some(r=>r.storeId===id);
-  const hasBrk =(id)=> (State.coinBreakage||[]).some(r=>r.storeId===id);
   const rankAsc=(pool, valFn)=> pool.map(s=>({storeId:s.id, brand:s.brand, val:valFn(s.id)})).sort((a,b)=>a.val-b.val);
   const cat=(key, pool, valFn)=>{ const pts=State.coinConfig[key]||[0,0,0]; return rankAsc(pool, valFn).slice(0,3).map((x,i)=>({...x, category:key, rank:i+1, coins:pts[i]||0})); };
+  // 0円ペナルティ：棚卸実施だが記録が0円＝マネジメント不足として減点
+  const pen=(key, pool)=> pool.map(s=>({storeId:s.id, brand:s.brand, category:key, rank:0, coins:COIN_ZERO_PENALTY, penalty:true, val:0}));
   // 棚卸金額：棚卸実施店（合計>0）が対象
   const inv=cat('inv', elig, id=>{ try{ return getStoreTotals(id).total; }catch(_){ return 0; } });
-  // 食材ロス・器物破損：棚卸実施かつ その部門に記録がある店舗のみ対象
-  const loss=cat('loss', elig.filter(s=>hasLoss(s.id)), lossSum);
-  const breakage=cat('breakage', elig.filter(s=>hasBrk(s.id)), brkSum);
-  return { month, inv, loss, breakage, all:[...inv,...loss,...breakage] };
+  // 食材ロス・器物破損：記録がある店（>0円）を少ない順で表彰。0円の店は減点。
+  const lossWin=cat('loss', elig.filter(s=>lossSum(s.id)>0), lossSum);
+  const brkWin =cat('breakage', elig.filter(s=>brkSum(s.id)>0), brkSum);
+  const lossPen=pen('loss', elig.filter(s=>lossSum(s.id)===0));
+  const brkPen =pen('breakage', elig.filter(s=>brkSum(s.id)===0));
+  const loss=[...lossWin, ...lossPen];
+  const breakage=[...brkWin, ...brkPen];
+  return { month, inv, loss, breakage, all:[...inv, ...loss, ...breakage] };
 }
 function coinMonthTotals(comp){ const m={}; comp.all.forEach(a=>{ m[a.storeId]=(m[a.storeId]||0)+a.coins; }); return m; }
 function coinMedalByStore(comp){
@@ -3189,18 +3212,18 @@ window.coinExportExcel = function(){
   const headStyle  = { font:{ bold:true, color:{rgb:'FFFFFF'} }, fill:{ fgColor:{rgb:'D97706'} }, alignment:{ horizontal:'center' } };
   const fills = [ {fill:{fgColor:{rgb:'FEF3C7'}}}, {fill:{fgColor:{rgb:'EEF2F7'}}}, {fill:{fgColor:{rgb:'FFEDD5'}}} ];
   const buildSheet = (name, rows, colName) => {
-    const aoa = [[name], ['順位', colName, 'コイン'], ...rows.map((r,i)=>[(i+1)+'位', r.name, r.coins])];
+    const aoa = [[name], ['順位', colName, 'コイン'], ...rows.map((r,i)=>[r.penalty?'減点(0円)':((i+1)+'位'), r.name, r.coins])];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{wch:8},{wch:24},{wch:10}];
+    ws['!cols'] = [{wch:10},{wch:24},{wch:10}];
     if (ws['A1']) ws['A1'].s = titleStyle;
     ['A2','B2','C2'].forEach(c => { if (ws[c]) ws[c].s = headStyle; });
-    rows.forEach((r,i) => { if (i < 3) ['A','B','C'].forEach(col => { const cell = ws[col+(i+3)]; if (cell) cell.s = fills[i]; }); });
+    rows.forEach((r,i) => { if (i < 3 && !r.penalty) ['A','B','C'].forEach(col => { const cell = ws[col+(i+3)]; if (cell) cell.s = fills[i]; }); });
     XLSX.utils.book_append_sheet(wb, ws, name);
   };
   buildSheet('年間ランキング', yearTop.map(([id,c])=>({name:coinStoreName(id),coins:c})), '店舗');
   buildSheet('今月総合(暫定)', monthTop.map(([id,c])=>({name:coinStoreName(id),coins:c})), '店舗');
-  buildSheet('食材ロス少', comp.loss.map(a=>({name:coinStoreName(a.storeId),coins:a.coins})), '店舗');
-  buildSheet('器物破損少', comp.breakage.map(a=>({name:coinStoreName(a.storeId),coins:a.coins})), '店舗');
+  buildSheet('食材ロス少', comp.loss.map(a=>({name:coinStoreName(a.storeId),coins:a.coins,penalty:!!a.penalty})), '店舗');
+  buildSheet('器物破損少', comp.breakage.map(a=>({name:coinStoreName(a.storeId),coins:a.coins,penalty:!!a.penalty})), '店舗');
   buildSheet('棚卸金額少', comp.inv.map(a=>({name:coinStoreName(a.storeId),coins:a.coins})), '店舗');
   XLSX.writeFile(wb, 'FevaCOIN_' + State.month + '_ランキング.xlsx');
 };
@@ -3210,11 +3233,13 @@ window.coinPrintRanking = function(){
   const yearTop  = Object.entries(coinYearTotals()).sort((a,b)=>b[1]-a[1]);
   const medalOf = (i) => i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'位';
   const rkTable = (title, rows, colName) => {
-    const body = rows.length ? rows.map((r,i)=>`<tr class="${i<3?'rk'+(i+1):''}"><td class="pos">${medalOf(i)}</td><td>${escapeHtml(r.name)}</td><td class="num">${coinIcon(14)} ${r.coins}</td></tr>`).join('')
+    const body = rows.length ? rows.map((r,i)=> r.penalty
+        ? `<tr style="background:#fef2f2;"><td class="pos" style="color:#b91c1c;">減点</td><td>${escapeHtml(r.name)}（0円・管理不足）</td><td class="num" style="color:#dc2626;font-weight:700;">${r.coins}</td></tr>`
+        : `<tr class="${i<3?'rk'+(i+1):''}"><td class="pos">${medalOf(i)}</td><td>${escapeHtml(r.name)}</td><td class="num">${coinIcon(14)} ${r.coins}</td></tr>`).join('')
       : '<tr><td colspan="3" style="color:#94a3b8;">対象データがありません</td></tr>';
     return `<h3>${title}</h3><table class="rk"><thead><tr><th>順位</th><th>${colName}</th><th class="num">コイン</th></tr></thead><tbody>${body}</tbody></table>`;
   };
-  const catRows = (arr) => arr.map(a=>({name:coinStoreName(a.storeId),coins:a.coins}));
+  const catRows = (arr) => arr.map(a=>({name:coinStoreName(a.storeId),coins:a.coins,penalty:!!a.penalty}));
   const html = '<html><head><meta charset="utf-8"><title>FevaCOIN ランキング</title>'+
     '<style>body{font-family:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",sans-serif;padding:24px;color:#1e293b;}'+
     'h2{margin:0 0 4px;}h3{margin:18px 0 6px;font-size:15px;}'+
@@ -3233,7 +3258,9 @@ window.coinPrintRanking = function(){
   w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch(_){} }, 300);
 };
 function coinCatTable(title, arr){
-  const rows = arr.length ? arr.map(a=>`<tr><td>${a.rank}</td><td>${escapeHtml(coinStoreName(a.storeId))}</td><td class="num">${coinIcon(14)} ${a.coins}</td></tr>`).join('')
+  const rows = arr.length ? arr.map(a=> a.penalty
+      ? `<tr style="background:#fef2f2;"><td style="color:#b91c1c;font-weight:700;">✕</td><td>${escapeHtml(coinStoreName(a.storeId))}<div style="font-size:11px;color:#b91c1c;font-weight:600;">0円はありえません。マネジメントができていません</div></td><td class="num" style="color:#dc2626;font-weight:700;">${a.coins}</td></tr>`
+      : `<tr><td>${a.rank}</td><td>${escapeHtml(coinStoreName(a.storeId))}</td><td class="num">${coinIcon(14)} ${a.coins}</td></tr>`).join('')
     : '<tr><td colspan="3" style="color:#94a3b8;">対象店舗がありません</td></tr>';
   return `<div class="coin-cat"><h4>${title}</h4><table class="fl-table"><thead><tr><th>順位</th><th>店舗</th><th class="num">コイン</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
@@ -3264,7 +3291,7 @@ function renderCoins(){
         <button class="btn btn-secondary btn-sm" data-action="coin-save-config">設定を保存</button>
         <button class="btn btn-primary btn-sm" data-action="coin-confirm">${coinIcon(16)} 今月のコインを確定する</button>
       </div>
-      <div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.6;">確定すると年間ランキング・年間表彰に反映されます。再確定で上書きされます。集計対象は棚卸実施済み（合計>0）の店舗のみ。</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.6;">確定すると年間ランキング・年間表彰に反映されます。再確定で上書きされます。集計対象は棚卸実施済み（合計>0）の店舗のみ。<br>※ 食材ロス・器物破損が<b>0円（記録なし）</b>の店舗は「管理不足」として各部門 <b>−5コイン</b>減点されます（両部門0円なら月−10）。</div>
     </div>` : '';
 
   return `
