@@ -2081,9 +2081,9 @@ function flStoreRankTableHTML(rankObj, amtLabel){
   const zero = (rankObj && rankObj.zero) || [];
   const rk = rankTies(rec);
   const recRows = rec.map((e,i)=>'<tr><td>'+rk[i]+'</td><td>'+escapeHtml(String(e[0]))+'</td><td class="num">¥'+(Number(e[1])||0).toLocaleString('ja-JP')+'</td></tr>').join('');
-  const zeroRows = zero.map(e=>'<tr style="background:#fef2f2;"><td style="color:#b91c1c;font-weight:700;">✕</td><td>'+escapeHtml(String(e[0]))+'<div style="font-size:11px;color:#b91c1c;font-weight:600;">0円はありえません。マネジメントができていません</div></td><td class="num" style="color:#dc2626;font-weight:700;">−5コイン</td></tr>').join('');
+  const zeroRows = zero.map(e=>'<tr style="background:#fef2f2;"><td style="color:#b91c1c;font-weight:700;">✕</td><td>'+escapeHtml(String(e[0]))+'<div style="font-size:11px;color:#b91c1c;font-weight:600;">0円はありえません。マネジメントができていません</div></td><td class="num" style="color:#dc2626;font-weight:700;">−10コイン</td></tr>').join('');
   const body = (rec.length||zero.length) ? (recRows+zeroRows) : '<tr><td colspan="3" style="color:#94a3b8;text-align:center;">対象の店舗がありません</td></tr>';
-  const warn = zero.length ? '<div style="margin:6px 0 8px;padding:6px 10px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#b91c1c;font-size:12px;font-weight:700;">⚠ 0円はありえません。マネジメントができていません（各店 −5コイン）</div>' : '';
+  const warn = zero.length ? '<div style="margin:6px 0 8px;padding:6px 10px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#b91c1c;font-size:12px;font-weight:700;">⚠ 0円はありえません。マネジメントができていません（各店 −10コイン）</div>' : '';
   const note = '記録がある店＝少ない順で優秀／0円＝管理不足で減点（同額は同順位）';
   return '<h4 style="margin:12px 0 6px;font-size:13px;color:#334155;">■ 店舗別ランキング<span style="font-weight:400;color:#94a3b8;font-size:11px;margin-left:6px;">'+note+'</span></h4>'
     + warn
@@ -3134,7 +3134,7 @@ async function loadCoins(){
 function coinAutoLoad(){ if(State._coinLoadedFor !== State.month){ State._coinLoadedFor = State.month; loadCoins().then(()=>render()); } }
 
 // 当月のライブ集計（確定前のプレビュー）
-const COIN_ZERO_PENALTY = -5; // 0円（管理不足）ペナルティ：食材ロス・器物破損それぞれで減点
+const COIN_ZERO_PENALTY = -10; // 0円（管理不足）ペナルティ：食材ロス・器物破損それぞれで減点
 function coinComputeMonth(month){
   const elig = (State.stores||[]).filter(s=>{ try{ return getStoreTotals(s.id).total>0; }catch(_){ return false; } });
   const lossSum=(id)=> (State.coinLoss||[]).filter(r=>r.storeId===id).reduce((a,b)=>a+(Number(b.amountExcl)||0),0);
@@ -3291,7 +3291,7 @@ function renderCoins(){
         <button class="btn btn-secondary btn-sm" data-action="coin-save-config">設定を保存</button>
         <button class="btn btn-primary btn-sm" data-action="coin-confirm">${coinIcon(16)} 今月のコインを確定する</button>
       </div>
-      <div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.6;">確定すると年間ランキング・年間表彰に反映されます。再確定で上書きされます。集計対象は棚卸実施済み（合計>0）の店舗のみ。<br>※ 食材ロス・器物破損が<b>0円（記録なし）</b>の店舗は「管理不足」として各部門 <b>−5コイン</b>減点されます（両部門0円なら月−10）。</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.6;">確定すると年間ランキング・年間表彰に反映されます。再確定で上書きされます。集計対象は棚卸実施済み（合計>0）の店舗のみ。<br>※ 食材ロス・器物破損が<b>0円（記録なし）</b>の店舗は「管理不足」として各部門 <b>−10コイン</b>減点されます（両部門0円なら月−20）。</div>
     </div>` : '';
 
   return `
