@@ -223,10 +223,12 @@ const sbStorage = (() => {
     if (metaRes.error) { console.error('meta fetch', metaRes.error); return null; }
     const inv = {};
     for (const e of (entriesRes.data || [])) {
-      if (!inv[e.store_id]) inv[e.store_id] = { entries: {}, notes: {} };
+      if (!inv[e.store_id]) inv[e.store_id] = { entries: {}, notes: {}, prices: {} };
+      if (!inv[e.store_id].prices) inv[e.store_id].prices = {};
       inv[e.store_id].entries[e.item_id] = Number(e.quantity);
       if (e.note) inv[e.store_id].notes[e.item_id] = e.note;
       if (e.entered_by) inv[e.store_id].enteredBy = e.entered_by;
+      if (e.unit_price != null) inv[e.store_id].prices[e.item_id] = Number(e.unit_price);
     }
     for (const m of (metaRes.data || [])) {
       if (!inv[m.store_id]) inv[m.store_id] = { entries: {}, notes: {} };
@@ -258,14 +260,16 @@ const sbStorage = (() => {
         // 数量0は「クリア」を意味するため、スキップせず quantity:0 でupsertしサーバ側の旧値を確実に上書き消去する（0はDELETE代替）。
         // 本当に未入力（キー無し/空）かつメモも無い場合のみ送信対象外とする。
         if ((q === undefined || q === '') && !note) continue;
-        entryRows.push({
+        const _row = {
           store_id: storeId,
           month: ym,
           item_id: itemId,
           quantity: q || 0,
           note,
           entered_by: enteredByName
-        });
+        };
+        const _up = masterPriceOf(itemId); if (_up != null) _row.unit_price = _up; // 保存時点の単価を記録
+        entryRows.push(_row);
       }
       const hasMeta = inv.completed !== undefined ||
                       (inv.inputBy != null && inv.inputBy !== '') ||
@@ -296,10 +300,21 @@ const sbStorage = (() => {
     return true;
   }
 
+  // 保存時点のマスタ単価を取得（スナップショット用）。マスタ未取得なら null（列を送らず既存値を温存）。
+  function masterPriceOf(itemId) {
+    const groups = (typeof State !== 'undefined' && State.items) || {};
+    for (const b of Object.keys(groups)) {
+      const it = (groups[b] || []).find(x => x && x.id === itemId);
+      if (it) return Number(it.price) || 0;
+    }
+    return null;
+  }
+
   // 単一エントリのみ upsert（他端末が編集した別項目を巻き込まない＝数値の戻り/増減対策）
   async function saveOneEntryRow(storeId, ym, itemId, quantity, note) {
     const enteredByName = (typeof State !== 'undefined' && State.enteredByName) || null;
     const row = { store_id: storeId, month: ym, item_id: itemId, quantity: quantity || 0, note: note || null, entered_by: enteredByName };
+    const up = masterPriceOf(itemId); if (up != null) row.unit_price = up; // 保存時点の単価を記録
     const { error } = await sb.from('inventory_entries').upsert([row], { onConflict: 'store_id,month,item_id' });
     if (error) { console.error('entry upsert(one)', error); _lastDbError = '在庫数量: ' + (error.message || JSON.stringify(error)); return false; }
     return true;
@@ -1256,13 +1271,23 @@ function getStoreEntries(storeId) {
   return inv?.entries || {};
 }
 
+// 棚卸金額の単価：進行中（当月度）は最新のマスタ単価、過去月度は保存時のスナップショット単価を使う。
+// これにより月ごとに変動する食材原価でも、過去の棚卸金額が後からの単価変更でブレない。
+function invUnitPrice(storeId, it) {
+  if (!it) return 0;
+  if (State.month === currentMonth()) return Number(it.price) || 0; // 当月度は常に最新マスタ単価
+  const snap = State.inventory && State.inventory[storeId] && State.inventory[storeId].prices
+    ? State.inventory[storeId].prices[it.id] : undefined;
+  return (snap != null && !isNaN(snap)) ? Number(snap) : (Number(it.price) || 0);
+}
+
 function getStoreTotal(storeId) {
   const items = getStoreItems(storeId);
   const entries = getStoreEntries(storeId);
   let total = 0;
   for (const it of items) {
     const q = parseFloat(entries[it.id]);
-    if (!isNaN(q) && q > 0) total += q * (it.price || 0);
+    if (!isNaN(q) && q > 0) total += q * invUnitPrice(storeId, it);
   }
   return total;
 }
@@ -1275,7 +1300,7 @@ function getStoreTotals(storeId) {
   for (const it of items) {
     const q = parseFloat(entries[it.id]);
     if (!isNaN(q) && q > 0) {
-      const amt = q * (it.price || 0);
+      const amt = q * invUnitPrice(storeId, it);
       if (it.kind === 'supplies') supplies += amt;
       else food += amt;
     }
@@ -1315,9 +1340,10 @@ function getHighValueItems(storeId) {
   for (const it of items) {
     const q = parseFloat(entries[it.id]);
     if (!isNaN(q) && q > 0) {
-      const amount = q * (it.price || 0);
+      const unitP = invUnitPrice(storeId, it);
+      const amount = q * unitP;
       if (isHighValueAmount(amount, it)) {
-        list.push({ ...it, qty: q, amount });
+        list.push({ ...it, qty: q, price: unitP, amount });
       }
     }
   }
@@ -1769,7 +1795,7 @@ function renderTopbar() {
 // アプリのバージョン番号（バージョンアップのたびにここだけ更新すればログイン画面に反映されます）
 const LOGO_KOESA_IMG = '/assets/logo-koesa.png';
 const LOGO_WORDMARK_IMG = '/assets/logo-wordmark.png';
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 function renderLogin() {
   return `
   <div class="lx-wrap">
@@ -4510,7 +4536,8 @@ function renderInventory() {
       : shownItems.map(it => {
           const rawV = entries[it.id];
           const v = (rawV === undefined || rawV === null || parseFloat(rawV) === 0) ? '' : rawV; // 0(クリア済)は空表示
-          const amount = v ? parseFloat(v) * (it.price || 0) : 0;
+          const unitP = invUnitPrice(store.id, it);
+          const amount = v ? parseFloat(v) * unitP : 0;
           const hasVal = v !== '' && parseFloat(v) > 0;
           const isHigh = hasVal && isHighValueAmount(amount, it);
           const noteText = notes[it.id] || '';
@@ -4522,7 +4549,7 @@ function renderInventory() {
                 <div class="name">${escapeHtml(it.name)}${it.seasonal ? ` <span class="season-pill">季節</span>` : ''}${isHigh ? ` <span class="alert-icon">⚠ ${getItemThreshold(it).toLocaleString()}円超</span>` : ''}</div>
                 <div class="meta">
                   <span class="unit-pill">${escapeHtml(it.unit || '個')}</span>
-                  <span>単価 ${formatYen(it.price)}</span>
+                  <span>単価 ${formatYen(unitP)}</span>
                 </div>
               </div>
               ${it.supplier ? `<div class="supplier-line">仕入先: ${escapeHtml(it.supplier)}</div>` : ''}
@@ -6203,7 +6230,7 @@ function handleQtyInput(e) {
   const amountEl = (el.closest('.qty-cell') || el.parentElement).querySelector('.amount-mini');
   if (item && amountEl) {
     if (val && numVal > 0) {
-      amountEl.textContent = formatYen(numVal * item.price);
+      amountEl.textContent = formatYen(numVal * invUnitPrice(storeId, item));
       el.classList.add('has-value');
     } else {
       amountEl.textContent = '';
@@ -6994,7 +7021,8 @@ function buildPrintHTML(storeId) {
     let rowsHtml = '';
     for (const it of byCat[cat]) {
       const q = parseFloat(entries[it.id]) || 0;
-      const amt = q * (it.price || 0);
+      const unitP = invUnitPrice(storeId, it);
+      const amt = q * unitP;
       subtotal += amt;
       const isHigh = isHighValueAmount(amt, it);
       const note = notes[it.id];
@@ -7003,7 +7031,7 @@ function buildPrintHTML(storeId) {
         <td class="col-name">${escapeHtml(it.name)}${isHigh ? ' ⚠' : ''}${note ? `<div style="font-size:7.5pt;color:#666;">📝 ${escapeHtml(note)}</div>` : ''}</td>
         <td style="font-size:8pt;">${escapeHtml(it.supplier || '')}</td>
         <td class="col-unit">${escapeHtml(it.unit || '')}</td>
-        <td class="col-num">${(it.price || 0).toLocaleString('ja-JP', {maximumFractionDigits: 2})}</td>
+        <td class="col-num">${(unitP || 0).toLocaleString('ja-JP', {maximumFractionDigits: 2})}</td>
         <td class="col-num">${q ? q.toLocaleString('ja-JP') : ''}</td>
         <td class="col-num">${amt ? Math.round(amt).toLocaleString('ja-JP') : ''}</td>
       </tr>`;
@@ -7097,11 +7125,12 @@ function buildSheetRows(storeId) {
     let sub = 0;
     for (const it of byCat[cat]) {
       const q = parseFloat(entries[it.id]) || 0;
-      const amt = q * (it.price || 0);
+      const unitP = invUnitPrice(storeId, it);
+      const amt = q * unitP;
       sub += amt;
       const alert = isHighValueAmount(amt, it) ? '⚠ ¥' + getItemThreshold(it).toLocaleString() + '超' : '';
       const note = notes[it.id] || '';
-      rows.push([cat, itemNo(it), it.name, it.supplier || '', it.unit || '', it.price || 0, q || '', amt || '', note, alert]);
+      rows.push([cat, itemNo(it), it.name, it.supplier || '', it.unit || '', unitP || 0, q || '', amt || '', note, alert]);
     }
     rows.push(['', '', '', '', '', '', '小計', Math.round(sub), '', '']);
   }

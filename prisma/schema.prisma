@@ -78,6 +78,7 @@ model InventoryEntry {
   quantity   Float   @default(0)
   note       String?
   entered_by String?
+  unit_price Float? // 保存時点のマスタ単価スナップショット（月変動する食材原価を月度ごとに固定）
 
   @@id([store_id, month, item_id])
   @@map("inventory_entries")
