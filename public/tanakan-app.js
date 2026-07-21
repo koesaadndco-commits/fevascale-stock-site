@@ -3071,11 +3071,16 @@ function coinComputeMonth(month){
   const elig = (State.stores||[]).filter(s=>{ try{ return getStoreTotals(s.id).total>0; }catch(_){ return false; } });
   const lossSum=(id)=> (State.coinLoss||[]).filter(r=>r.storeId===id).reduce((a,b)=>a+(Number(b.amountExcl)||0),0);
   const brkSum =(id)=> (State.coinBreakage||[]).filter(r=>r.storeId===id).reduce((a,b)=>a+(Number(b.amountExcl)||0),0);
-  const rankAsc=(valFn)=> elig.map(s=>({storeId:s.id, brand:s.brand, val:valFn(s.id)})).sort((a,b)=>a.val-b.val);
-  const cat=(key,valFn)=>{ const pts=State.coinConfig[key]||[0,0,0]; return rankAsc(valFn).slice(0,3).map((x,i)=>({...x, category:key, rank:i+1, coins:pts[i]||0})); };
-  const inv=cat('inv', id=>{ try{ return getStoreTotals(id).total; }catch(_){ return 0; } });
-  const loss=cat('loss', lossSum);
-  const breakage=cat('breakage', brkSum);
+  // その部門に「入力がある店舗」だけを対象にする（未入力＝0円で最少入賞してしまう不具合を防止）
+  const hasLoss=(id)=> (State.coinLoss||[]).some(r=>r.storeId===id);
+  const hasBrk =(id)=> (State.coinBreakage||[]).some(r=>r.storeId===id);
+  const rankAsc=(pool, valFn)=> pool.map(s=>({storeId:s.id, brand:s.brand, val:valFn(s.id)})).sort((a,b)=>a.val-b.val);
+  const cat=(key, pool, valFn)=>{ const pts=State.coinConfig[key]||[0,0,0]; return rankAsc(pool, valFn).slice(0,3).map((x,i)=>({...x, category:key, rank:i+1, coins:pts[i]||0})); };
+  // 棚卸金額：棚卸実施店（合計>0）が対象
+  const inv=cat('inv', elig, id=>{ try{ return getStoreTotals(id).total; }catch(_){ return 0; } });
+  // 食材ロス・器物破損：棚卸実施かつ その部門に記録がある店舗のみ対象
+  const loss=cat('loss', elig.filter(s=>hasLoss(s.id)), lossSum);
+  const breakage=cat('breakage', elig.filter(s=>hasBrk(s.id)), brkSum);
   return { month, inv, loss, breakage, all:[...inv,...loss,...breakage] };
 }
 function coinMonthTotals(comp){ const m={}; comp.all.forEach(a=>{ m[a.storeId]=(m[a.storeId]||0)+a.coins; }); return m; }
