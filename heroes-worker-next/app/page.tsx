@@ -51,22 +51,31 @@ export default function Home() {
       {/* HERO */}
       <section className="hero" id="top">
         <Sparks />
-        <Reveal className="wrap">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="hero-logo" src="/logo.png" alt="Heroes Worker ロゴ" />
-          <h1>
-            その一手間に、<span className="hl">職人の誇り</span>を。
-          </h1>
-          <p className="lead">{site.description}</p>
-          <div className="hero-actions">
-            <Link href="/#contact" className="btn btn-primary">
-              無料で見積もり依頼 →
-            </Link>
-            <Link href="/works" className="btn btn-ghost">
-              施工事例を見る
-            </Link>
-          </div>
-        </Reveal>
+        <div className="wrap hero-grid">
+          <Reveal className="hero-copy">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="hero-logo" src="/logo.png" alt="Heroes Worker ロゴ" />
+            <h1>
+              その一手間に、<span className="hl">職人の誇り</span>を。
+            </h1>
+            <p className="lead">{site.description}</p>
+            <div className="hero-actions">
+              <Link href="/#contact" className="btn btn-primary">
+                無料で見積もり依頼 →
+              </Link>
+              <Link href="/works" className="btn btn-ghost">
+                施工事例を見る
+              </Link>
+            </div>
+          </Reveal>
+          <Reveal className="hero-portrait">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/shimizu.png" alt={`代表 ${site.company.rep}`} />
+            <span className="hero-portrait-name">
+              代表 清水 寛也
+            </span>
+          </Reveal>
+        </div>
       </section>
 
       {/* SERVICES */}
