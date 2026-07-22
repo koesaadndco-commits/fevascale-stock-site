@@ -121,6 +121,24 @@ export default function Home() {
         </div>
       </section>
 
+      {/* BANNER (atmosphere) */}
+      <section className="banner">
+        <div className="banner-overlay" />
+        <div className="wrap banner-inner">
+          <Reveal>
+            <span className="kicker">Our Craft</span>
+            <h2>
+              現場のひとつずつに、
+              <br />
+              職人の誇りを。
+            </h2>
+            <p>
+              溶接・金属加工のプロとして、一つひとつの仕事に真摯に向き合います。
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
       {/* STATS */}
       <section>
         <div className="wrap">
