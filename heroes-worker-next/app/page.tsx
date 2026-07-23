@@ -229,7 +229,35 @@ export default function Home() {
         </div>
       </section>
 
-      {/* GREETING (代表ごあいさつ) */}
+      {/* PHILOSOPHY (経営理念) */}
+      <section id="philosophy" className="philosophy">
+        <div className="wrap philo-inner">
+          <Reveal>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="philo-logo" src="/logo.png" alt="Heroes Worker" />
+            <div className="philo-divider">
+              <span />
+              <i>◆</i>
+              <span />
+            </div>
+            <span className="philo-kicker">Philosophy</span>
+            <p className="philo-sub">― 経営理念 ―</p>
+            <p className="philo-creed">
+              溶接・金属加工を通じて
+              <br />
+              関わるすべての方との
+              <br />
+              <span className="hl">繋がり</span>を大切にし
+              <br />
+              <span className="hl">感謝</span>の心を忘れず
+              <br />
+              <span className="hl">笑顔</span>を生み出す存在へ
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* GREETING (代表メッセージ) */}
       <section id="greeting">
         <div className="wrap media-grid">
           <Reveal className="media-photo faded-photo">
@@ -320,6 +348,29 @@ export default function Home() {
                   <div className="v">〒{site.address.zip}<br />{site.address.line}</div>
                 </div>
               </div>
+              <div className="info-row">
+                <span className="ic">📷</span>
+                <div>
+                  <div className="l">Instagram</div>
+                  <div className="v">
+                    <a href={site.social.instagram} target="_blank" rel="noopener noreferrer">
+                      {site.social.instagramHandle}
+                    </a>
+                  </div>
+                  <div className="l">施工事例を更新中</div>
+                </div>
+              </div>
+              <a
+                className="qr-card qr-card-contact"
+                href={site.social.instagram}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram（@heroes_worker）を開く"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/instagram-qr.svg" alt="Instagram QRコード" />
+                <span>スマホでスキャン → フォローお願いします</span>
+              </a>
             </div>
           </Reveal>
         </div>

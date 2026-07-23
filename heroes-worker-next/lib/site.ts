@@ -18,6 +18,10 @@ export const site = {
     line: "石川県小松市長崎町4丁目77",
     mapQuery: "石川県小松市長崎町4丁目77",
   },
+  social: {
+    instagram: "https://www.instagram.com/heroes_worker/",
+    instagramHandle: "@heroes_worker",
+  },
   company: {
     rep: "代表　清水 寛也",
     founded: "2026年3月19日",
