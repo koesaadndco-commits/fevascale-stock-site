@@ -58,7 +58,12 @@ header{position:sticky;top:0;z-index:50;background:rgba(10,10,10,.82);backdrop-f
 
 /* Hero */
 .hero{position:relative;overflow:hidden;padding:80px 0 84px;
-  background:radial-gradient(900px 500px at 50% -5%,rgba(255,122,24,.22),transparent 60%),radial-gradient(600px 400px at 85% 30%,rgba(232,93,4,.12),transparent 60%),linear-gradient(180deg,#0d0d0d,#0a0a0a)}
+  background:
+    linear-gradient(180deg,rgba(10,10,10,.72),rgba(10,10,10,.82)),
+    radial-gradient(900px 500px at 50% -5%,rgba(255,122,24,.20),transparent 60%),
+    radial-gradient(600px 400px at 85% 30%,rgba(232,93,4,.10),transparent 60%),
+    url('/hero-bg.jpg') center/cover no-repeat,
+    #0a0a0a}
 .spark{position:absolute;width:3px;height:3px;border-radius:50%;background:var(--ember);box-shadow:0 0 8px var(--orange);opacity:0;animation:rise 6s linear infinite}
 @keyframes rise{0%{transform:translateY(40px) scale(.6);opacity:0}15%{opacity:1}100%{transform:translateY(-260px) scale(0);opacity:0}}
 .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:12px;align-items:center;position:relative;z-index:1;overflow:visible}
