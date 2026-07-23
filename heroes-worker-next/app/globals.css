@@ -66,7 +66,7 @@ header{position:sticky;top:0;z-index:50;background:rgba(10,10,10,.82);backdrop-f
     #0a0a0a}
 .spark{position:absolute;width:3px;height:3px;border-radius:50%;background:var(--ember);box-shadow:0 0 8px var(--orange);opacity:0;animation:rise 6s linear infinite}
 @keyframes rise{0%{transform:translateY(40px) scale(.6);opacity:0}15%{opacity:1}100%{transform:translateY(-260px) scale(0);opacity:0}}
-.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:12px;align-items:center;position:relative;z-index:1;overflow:visible}
+.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;position:relative;z-index:1;overflow:visible}
 .hero-copy{text-align:center;position:relative;z-index:3}
 .hero-logo{width:min(520px,44vw);max-width:100%;margin:0 auto 22px;position:relative;z-index:4;filter:drop-shadow(0 0 40px rgba(255,122,24,.35))}
 .hero h1{font-size:clamp(20px,2.7vw,31px);line-height:1.5;font-weight:900;white-space:nowrap;position:relative;z-index:3;text-shadow:0 2px 18px rgba(0,0,0,.55)}
@@ -79,7 +79,7 @@ header{position:sticky;top:0;z-index:50;background:rgba(10,10,10,.82);backdrop-f
   width:82%;aspect-ratio:1;border-radius:50%;
   background:radial-gradient(circle,rgba(255,122,24,.28),rgba(255,122,24,.06) 55%,transparent 72%);
   filter:blur(6px);z-index:0}
-.hero-portrait img{position:relative;z-index:1;width:auto;max-width:100%;max-height:min(640px,80vh);height:auto;
+.hero-portrait img{position:relative;z-index:1;width:100%;max-width:520px;height:auto;border-radius:16px;
   filter:drop-shadow(0 24px 40px rgba(0,0,0,.6))}
 .hero-portrait-name{position:relative;z-index:1;margin-top:-6px;font-family:var(--font-oswald),sans-serif;
   font-size:14px;letter-spacing:.08em;color:var(--ink-soft)}
@@ -95,7 +95,7 @@ header{position:sticky;top:0;z-index:50;background:rgba(10,10,10,.82);backdrop-f
   .hero p.lead{margin:20px auto 30px}
   .hero-actions{justify-content:center}
   .hero-portrait{order:-1;margin-left:0}
-  .hero-portrait img{width:auto;max-width:80%;max-height:52vh}
+  .hero-portrait img{width:100%;max-width:440px;max-height:none}
 }
 
 /* Section common */
@@ -156,6 +156,18 @@ table.profile th{width:32%;color:var(--ink-soft);font-weight:700;white-space:now
 .map-box{aspect-ratio:4/3;border-radius:var(--radius);overflow:hidden;border:1px solid var(--line);background:var(--panel)}
 .map-box iframe{width:100%;height:100%;border:0}
 @media(max-width:900px){.company-grid{grid-template-columns:1fr;gap:32px}}
+
+/* Media sections (職人の誇り / 代表ごあいさつ) */
+.media-grid{display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:center}
+.media-text .kicker{font-family:var(--font-oswald),sans-serif;font-size:14px;font-weight:700;letter-spacing:.22em;color:var(--orange);text-transform:uppercase}
+.media-text h2{font-size:clamp(24px,3.4vw,34px);font-weight:900;margin:8px 0 16px}
+.media-text p{color:var(--ink-soft);font-size:15.5px;line-height:1.95}
+.media-text .greeting-name{margin-top:18px;font-weight:700;color:var(--ink)}
+.media-photo img{width:100%;height:auto;border-radius:14px}
+.faded-photo img{
+  -webkit-mask-image:radial-gradient(ellipse 94% 90% at 50% 50%,#000 58%,transparent 100%);
+  mask-image:radial-gradient(ellipse 94% 90% at 50% 50%,#000 58%,transparent 100%)}
+@media(max-width:900px){.media-grid{grid-template-columns:1fr;gap:28px}.media-photo{order:-1}}
 
 /* Banner (atmosphere) */
 .banner{position:relative;min-height:min(58vh,500px);display:flex;align-items:center;padding:60px 0;overflow:hidden;

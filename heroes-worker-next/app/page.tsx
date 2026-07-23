@@ -70,9 +70,9 @@ export default function Home() {
               </Link>
             </div>
           </Reveal>
-          <Reveal className="hero-portrait">
+          <Reveal className="hero-portrait faded-photo">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/shimizu.png" alt={`代表 ${site.company.rep}`} />
+            <img src="/worker.jpg" alt={`代表 ${site.company.rep}`} />
             <span className="hero-portrait-name">
               代表 清水 寛也
             </span>
@@ -97,6 +97,23 @@ export default function Home() {
               </Reveal>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* CRAFT (職人の誇り) */}
+      <section id="craft" className="bg-2">
+        <div className="wrap media-grid">
+          <Reveal className="media-text">
+            <span className="kicker">Craftsmanship</span>
+            <h2>職人の誇りとプライド</h2>
+            <p>
+              一つひとつの溶接に、職人としての誇りとプライドを込めています。見えない部分こそ丁寧に。お客様に安心して長くお使いいただける仕上がりをお届けします。
+            </p>
+          </Reveal>
+          <Reveal className="media-photo faded-photo">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/craft.jpg" alt="工房で作業する代表" />
+          </Reveal>
         </div>
       </section>
 
@@ -208,6 +225,24 @@ export default function Home() {
             <Link href="/#contact" className="btn btn-white">
               無料相談・お見積もり →
             </Link>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* GREETING (代表ごあいさつ) */}
+      <section id="greeting">
+        <div className="wrap media-grid">
+          <Reveal className="media-photo faded-photo">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/greeting.jpg" alt="代表 清水 寛也" />
+          </Reveal>
+          <Reveal className="media-text">
+            <span className="kicker">Message</span>
+            <h2>代表メッセージ</h2>
+            <p>
+              このたびは Heroes Worker のホームページをご覧いただき、ありがとうございます。溶接・金属加工を通じて、お客様の「困った」を解決し、ご満足いただける商品をお届けすることが私たちの使命です。小さなご相談から大きな製作まで、誠心誠意対応いたします。どうぞお気軽にお声がけください。
+            </p>
+            <p className="greeting-name">代表　清水 寛也</p>
           </Reveal>
         </div>
       </section>
