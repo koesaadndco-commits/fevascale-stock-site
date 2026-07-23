@@ -1706,9 +1706,16 @@ function secSeenCount(section, period){
   try{ const o = JSON.parse(localStorage.getItem(secSeenKey(section)) || 'null'); if(o && o.period === period) return Number(o.count) || 0; }catch(_){}
   return 0; // この月度をまだ開いていない＝全件が新着
 }
-function markSectionSeen(section){
+const SECTION_TBL = { transfers:['transfer_slips','month'], foodloss:['food_loss','period'], breakage:['breakage','period'] };
+async function sectionRawCount(section){
+  const spec = SECTION_TBL[section]; if(!spec) return 0;
+  const [tbl,col] = spec;
+  try{ const { count } = await sb.from(tbl).select('id',{count:'exact',head:true}).eq(col, currentSlipPeriod()); return count||0; }catch(_){ return 0; }
+}
+async function markSectionSeen(section){
   const period = currentSlipPeriod();
-  const raw = (State._badgeRaw && State._badgeRaw[section]) || 0;
+  // バッジ集計の完了に依存せず、その場で実件数を数えてから既読にする（0で保存されて消えない不具合の防止）
+  const raw = await sectionRawCount(section);
   try{ localStorage.setItem(secSeenKey(section), JSON.stringify({ period, count: raw })); }catch(_){}
   const idMap = { transfers:'badge-transfers', foodloss:'badge-foodloss', breakage:'badge-breakage' };
   setBadge(idMap[section], 0); // 開いた瞬間にバッジを消す
@@ -5612,7 +5619,7 @@ function renderAdminUsers() {
             <option value="super_admin" ${u.role === 'super_admin' ? 'selected' : ''}>スーパー管理者</option>
             <option value="admin"   ${u.role === 'admin'   ? 'selected' : ''}>管理者</option>
             <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>業態責任者</option>
-            <option value="store_leader" ${u.role === 'store_leader' ? 'selected' : ''}>店舗リーダー</option>
+            <option value="store_leader" ${u.role === 'store_leader' ? 'selected' : ''}>店舗リーダー（店長）</option>
             <option value="trainer" ${u.role === 'trainer' ? 'selected' : ''}>トレーナー</option>
             <option value="staff"   ${u.role === 'staff'   ? 'selected' : ''}>スタッフ</option>
             <option value="soumu"   ${u.role === 'soumu'   ? 'selected' : ''}>総務</option>
@@ -6018,9 +6025,9 @@ async function handleAction(e) {
     case 'release-approval-deadline': await releaseApprovalDeadline(); break;
     case 'confirm-soumu': await confirmSoumu(); break;
     case 'revoke-soumu': await revokeSoumu(); break;
-    case 'goto-transfers': markSectionSeen('transfers'); await loadTransfers(State.month || currentSlipPeriod()); navigate('transfers'); break;
-    case 'goto-foodloss': if(!getFeatureFlags().foodloss){ toast('食材ロス管理は現在OFFです（KOESAコンソールで有効化）','error'); break; } markSectionSeen('foodloss'); await loadFoodLoss(); navigate('foodloss'); break;
-    case 'goto-breakage': if(!getFeatureFlags().breakage){ toast('器物破損管理は現在OFFです（KOESAコンソールで有効化）','error'); break; } markSectionSeen('breakage'); await loadBreakage(); navigate('breakage'); break;
+    case 'goto-transfers': await markSectionSeen('transfers'); await loadTransfers(State.month || currentSlipPeriod()); navigate('transfers'); break;
+    case 'goto-foodloss': if(!getFeatureFlags().foodloss){ toast('食材ロス管理は現在OFFです（KOESAコンソールで有効化）','error'); break; } await markSectionSeen('foodloss'); await loadFoodLoss(); navigate('foodloss'); break;
+    case 'goto-breakage': if(!getFeatureFlags().breakage){ toast('器物破損管理は現在OFFです（KOESAコンソールで有効化）','error'); break; } await markSectionSeen('breakage'); await loadBreakage(); navigate('breakage'); break;
     case 'goto-coins': await loadCoins(); navigate('coins'); break;
     case 'coin-confirm': await coinConfirmMonth(); break;
     case 'coin-save-config': await coinSaveConfig(); break;
@@ -6483,9 +6490,12 @@ function addUserDialog() {
           <label class="field">権限</label>
           <select class="select" id="u-role">
             <option value="staff"   selected>スタッフ（自店舗のみ）</option>
+            <option value="store_leader">店舗リーダー（店長）</option>
+            <option value="trainer">トレーナー</option>
             <option value="manager">業態責任者（承認可）</option>
-            <option value="admin">管理者（全権限）</option>
             <option value="soumu">総務（閲覧のみ）</option>
+            <option value="director">役員（確認押印）</option>
+            <option value="admin">管理者（全権限）</option>
           </select>
         </div>
         <div>
