@@ -56,11 +56,9 @@ export default function Home() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img className="hero-logo" src="/logo.png" alt="Heroes Worker ロゴ" />
             <h1>
-              妥協しない。だから、
+              職人の誇りとプライドを<span className="hl">商品価値</span>へ。
               <br />
-              いつも<span className="hl">最高品質</span>。
-              <br />
-              これが<span className="hl">職人の誇りとプライド</span>。
+              妥協しない。だから、いつも<span className="hl">最高品質</span>。
             </h1>
             <p className="lead">{site.description}</p>
             <div className="hero-actions">
@@ -127,15 +125,16 @@ export default function Home() {
         <div className="banner-overlay" />
         <div className="wrap banner-inner">
           <Reveal>
-            <span className="kicker">Our Craft</span>
+            <span className="kicker">Support</span>
             <h2>
-              現場のひとつずつに、
+              最大力で対応する、
               <br />
-              職人の誇りを。
+              溶接の<span className="hl">お困りごと解決</span>業。
             </h2>
-            <p>
-              溶接・金属加工のプロとして、一つひとつの仕事に真摯に向き合います。
-            </p>
+            <p>緊急対応や短期納品など、まずはご連絡ください。</p>
+            <Link href="/#contact" className="btn btn-primary" style={{ marginTop: 20 }}>
+              まずは相談する →
+            </Link>
           </Reveal>
         </div>
       </section>
