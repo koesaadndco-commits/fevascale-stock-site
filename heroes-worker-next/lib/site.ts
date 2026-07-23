@@ -2,7 +2,7 @@
 export const site = {
   name: "Heroes Worker",
   nameJa: "ヒーローズワーカー",
-  tagline: "その一手間に、職人の誇りを。",
+  tagline: "妥協しない。だから、いつも最高品質。",
   description:
     "Heroes Worker（ヒーローズワーカー）は、TIG・MIG・アーク溶接から金属加工・製缶まで対応する溶接のプロ集団。一品物から量産まで、確かな技術で「つくりたい」をかたちにします。",
   // 取得したドメインに合わせて書き換えてください（例: https://heroesworker.com）
