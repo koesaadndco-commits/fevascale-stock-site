@@ -4,7 +4,7 @@ export const site = {
   nameJa: "ヒーローズワーカー",
   tagline: "妥協しない。だから、いつも最高品質。",
   description:
-    "Heroes Worker（ヒーローズワーカー）は、TIG・MIG・アーク溶接から金属加工・製缶まで対応する溶接のプロ集団。一品物から量産まで、確かな技術で「つくりたい」をかたちにします。",
+    "Heroes Worker（ヒーローズワーカー）は、TIG・MIG・アーク溶接から金属加工・製缶まで対応する溶接のプロ集団。一品物から量産まで、確かな技術でつくりたいをカタチにします。",
   url: "https://heroes-worker.com",
   contact: {
     person: "シミズ",
